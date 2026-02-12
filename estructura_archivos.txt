@@ -1,0 +1,51 @@
+backend_productos/
+├─ app.py                         # Sólo arranque local (opcional) o CLI
+├─ wsgi.py                        # Punto de entrada en producción (gunicorn)
+├─ requirements.txt
+├─ .env                           # DATABASE_URL, JWT_SECRET_KEY, etc.
+├─ instance/                      # Config propia de instancia (opcional)
+│   └─ config.py
+├─ app/                           # ¡Tu paquete de aplicación!
+│  ├─ __init__.py                 # create_app(), registro de extensiones/blueprints
+│  ├─ config.py                   # Config por entorno (Dev/Prod/Test)
+│  ├─ extensions.py               # db, jwt, cors, migrate, logging
+│  ├─ models/                     # Modelos SQLAlchemy
+│  │  ├─ __init__.py
+│  │  ├─ user.py                  # Usuario, Rol, Permiso, relaciones
+│  │  ├─ customer.py              # Cliente
+│  │  ├─ product.py               # Producto, Inventario
+│  │  ├─ sale.py                  # Sale, SaleDetail
+│  │  ├─ cash_register.py         # CashRegister, Movements, Status
+│  │  ├─ invoice.py               # Invoice, InvoiceNumber, tipos
+│  ├─ schemas/                    # (opcional) Marshmallow p/ validar/serializar
+│  │  ├─ __init__.py
+│  │  ├─ customer.py
+│  │  └─ sale.py
+│  ├─ repositories/               # Acceso/consultas a BD (opcional pero ordena)
+│  │  ├─ __init__.py
+│  │  ├─ customer_repo.py
+│  │  └─ sale_repo.py
+│  ├─ services/                   # Reglas de negocio (caja, ventas, numeración)
+│  │  ├─ __init__.py
+│  │  ├─ sales_service.py
+│  │  ├─ cash_register_service.py
+│  │  └─ invoice_service.py
+│  ├─ api/                        # Blueprints (rutas) por módulo
+│  │  ├─ __init__.py
+│  │  ├─ auth.py                  # /api/auth/*  login/refresh/roles
+│  │  ├─ customers.py             # /api/customers/*
+│  │  ├─ products.py              # /api/products/*
+│  │  ├─ sales.py                 # /api/sales/*
+│  │  ├─ cash_register.py         # /api/cash-register/*
+│  │  └─ invoices.py              # /api/invoices/*  numeración incluida
+│  ├─ utils/
+│  │  ├─ __init__.py
+│  │  ├─ payments.py              # normalizar/clasificar forma de pago (de tu utils.py)
+│  │  ├─ security.py              # decorators roles_required, helpers JWT
+│  │  └─ pagination.py            # paginado, filtros comunes
+│  ├─ errors/
+│  │  ├─ __init__.py
+│  │  └─ handlers.py              # manejadores 400/401/403/404/422/500 uniformes
+│  └─ cli/
+│     └─ seed.py                  # comandos Flask CLI: seed, crear admin, etc.
+└─ migrations/                    # Flask-Migrate/Alembic
