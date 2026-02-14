@@ -12,6 +12,7 @@ bp = Blueprint("auth", __name__)
 # -----------------------------
 # Decorador de roles
 # -----------------------------
+# -----------SE AGREGA COMENTARIO PARA SABER SI EL PUSH AUTOMATICO FUNCIONE------------------ 
 def roles_required(roles):
     """
     Uso: @roles_required(['Admin', 'Gerente'])

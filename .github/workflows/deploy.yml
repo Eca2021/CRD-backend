@@ -1,0 +1,25 @@
+name: Deploy al Servidor Ubuntu
+
+on:
+  push:
+    branches:
+      - main  # Se activa cuando haces push a main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar comandos en el servidor
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/sistema_creditos
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt
+            flask db upgrade
+            # Aquí reiniciamos tu backend (ajusta el nombre del servicio)
+            systemctl restart sistema_creditos
