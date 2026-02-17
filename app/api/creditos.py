@@ -320,3 +320,11 @@ def get_creditos():
 def get_creditos_by_cliente(id_cliente):
     creditos = Credito.query.filter_by(id_cliente=id_cliente).order_by(Credito.id_credito.desc()).all()
     return jsonify([c.to_dict() for c in creditos]), 200
+
+@bp.get("/<int:id_credito>")
+@permission_required("credito.gestionar")
+def get_credito_by_id(id_credito):
+    credito = Credito.query.get(id_credito)
+    if not credito:
+        return jsonify({"message": "Crédito no encontrado"}), 404
+    return jsonify(credito.to_dict()), 200
