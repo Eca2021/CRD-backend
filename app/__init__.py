@@ -18,6 +18,9 @@ def create_app():
     database_url = os.getenv("DATABASE_URL", "sqlite:///local.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"options": "-c client_encoding=utf8"}
+    }
 
     # 3) JWT (Flask-JWT-Extended espera timedelta)
     app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")

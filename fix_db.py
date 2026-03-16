@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from flask import Flask
 from app import create_app
@@ -60,6 +61,23 @@ def fix_database():
                 print("Tabla movimientos_contables verificada")
             except Exception as e:
                 print("Error creando tabla movimientos_contables:", e)
+
+            # 4. Crear tabla movimientos_admin si no existe
+            try:
+                connection.execute(text("""
+                    CREATE TABLE IF NOT EXISTS movimientos_admin (
+                        id SERIAL PRIMARY KEY,
+                        tipo VARCHAR(20) NOT NULL,
+                        monto NUMERIC(15, 2) NOT NULL,
+                        descripcion TEXT,
+                        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        id_usuario INTEGER,
+                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+                    )
+                """))
+                print("Tabla movimientos_admin verificada")
+            except Exception as e:
+                print("Error creando tabla movimientos_admin:", e)
 
             connection.commit()
             print("Reparacion completada exitosamente.")

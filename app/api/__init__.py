@@ -17,6 +17,8 @@ def register_blueprints(app):
     from app.api.creditos import bp as creditos_bp
     from app.api.pagos import bp as pagos_bp
     from app.api.contabilidad import bp as contabilidad_bp
+    from app.api.dashboard import bp as dashboard_bp
+    from app.api.reglas import bp as reglas_bp
 
 
     # ---- REGISTROS ----
@@ -30,3 +32,5 @@ def register_blueprints(app):
     app.register_blueprint(creditos_bp, url_prefix="/api/creditos")
     app.register_blueprint(pagos_bp, url_prefix="/api/pagos")
     app.register_blueprint(contabilidad_bp, url_prefix="/api/contabilidad")
+    app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
+    app.register_blueprint(reglas_bp, url_prefix="/api/reglas")

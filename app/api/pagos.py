@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.extensions import db
-from app.models.catalog import Pago, FormaPago, DetalleCredito, Credito, AsientoContable, MovimientoContable
+from app.models.catalog import Pago, FormaPago, DetalleCredito, Credito, AsientoContable, MovimientoContable, PagoAudit
 from datetime import datetime
 
 bp = Blueprint("pagos", __name__)
@@ -44,9 +44,11 @@ def registrar_pago():
     # Podríamos validar: if monto > saldo_pendiente: return error...
     
     # Registrar Pago
+    user_id = get_jwt_identity()
     nuevo_pago = Pago(
         id_detalle_credito=id_detalle,
         id_forma_pago=id_forma,
+        id_usuario=user_id,
         monto_pagado=monto,
         fecha_pago=datetime.now(),
         comprobante_nro=comprobante
@@ -166,7 +168,152 @@ def registrar_pago():
 
     try:
         db.session.commit()
+        
+        # 4. Registrar Auditoría (después del commit para tener el id_pago final)
+        try:
+            audit = PagoAudit(
+                id_pago=nuevo_pago.id_pago,
+                id_usuario=user_id,
+                accion='CREACION',
+                monto_registrado=monto,
+                id_detalle_credito=id_detalle,
+                estado_pago_momento='ACTIVO',
+                direccion_ip=request.remote_addr,
+                observacion=f"Pago registrado vía Caja. Comprobante: {comprobante or 'N/A'}"
+            )
+            db.session.add(audit)
+            db.session.commit()
+        except Exception as audit_err:
+            print(f"Error en auditoría (no bloqueante): {audit_err}")
+
         return jsonify({"message": "Pago registrado exitosamente", "pago": nuevo_pago.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "Error registrando pago", "error": str(e)}), 500
+@bp.get("/")
+@jwt_required()
+def get_pagos():
+    pagos = Pago.query.order_by(Pago.id_pago.desc()).all()
+    return jsonify([p.to_dict() for p in pagos]), 200
+
+@bp.get("/detalle/<int:id_detalle>")
+@jwt_required()
+def get_pagos_by_detalle(id_detalle):
+    pagos = Pago.query.filter_by(id_detalle_credito=id_detalle).order_by(Pago.id_pago.desc()).all()
+    return jsonify([p.to_dict() for p in pagos]), 200
+
+@bp.post("/<int:id_pago>/anular")
+@jwt_required()
+def anular_pago(id_pago):
+    pago = Pago.query.get(id_pago)
+    if not pago:
+        return jsonify({"message": "Pago no encontrado"}), 404
+
+    if pago.estado == 'ANULADO':
+        return jsonify({"message": "El pago ya está anulado"}), 400
+
+    detalle = DetalleCredito.query.get(pago.id_detalle_credito)
+    credito = Credito.query.get(detalle.id_credito)
+    forma = FormaPago.query.get(pago.id_forma_pago)
+    
+    monto = float(pago.monto_pagado)
+    user_id = get_jwt_identity()
+
+    try:
+        # 1. Anular el registro del pago
+        pago.estado = 'ANULADO'
+        
+        # 2. Revertir montos en el Detalle
+        detalle.monto_pagado = float(detalle.monto_pagado) - monto
+        if detalle.estado_cuota == 'PAGADO' and detalle.monto_pagado < float(detalle.monto_cuota):
+            detalle.estado_cuota = 'PENDIENTE'
+            
+        # 3. Revertir estado del Crédito
+        if credito.estado == 'PAGADO':
+            credito.estado = 'PENDIENTE'
+            
+        # 4. Asiento Contable de Reversión
+        asiento = AsientoContable(
+            glosa=f"REVERSIÓN Pago #{pago.id_pago} - Cuota #{detalle.numero_cuota} - Crédito #{credito.id_credito}",
+            id_usuario=user_id,
+            fecha=datetime.now()
+        )
+        db.session.add(asiento)
+        db.session.flush()
+
+        # Calcular proporciones para reversión contable (igual que al registrar)
+        total_esperado = float(detalle.cuota_total or 0)
+        cap_esperado = float(detalle.capital_cuota or 0)
+        int_esperado = float(detalle.interes_cuota or 0)
+        
+        pago_interes = 0.0
+        if total_esperado > 0:
+            ratio_int = int_esperado / total_esperado
+            pago_interes = monto * ratio_int
+
+        # A) SALIDA de CAJA (Haber)
+        mov_caja = MovimientoContable(
+            id_asiento=asiento.id_asiento,
+            cuenta='Caja',
+            debe=0,
+            haber=monto
+        )
+        db.session.add(mov_caja)
+        
+        # B) REPOSICIÓN de CUENTAS POR COBRAR (Debe)
+        mov_cxc = MovimientoContable(
+            id_asiento=asiento.id_asiento,
+            cuenta='Cuentas por Cobrar',
+            debe=monto,
+            haber=0
+        )
+        db.session.add(mov_cxc)
+        
+        # C) Reversión de Ganancia de Interés
+        if pago_interes > 0:
+            # Revertimos el Pasivo Diferido (Haber: vuelve a estar por cobrar)
+            mov_int_deferred = MovimientoContable(
+                id_asiento=asiento.id_asiento,
+                cuenta='Intereses por Cobrar',
+                debe=0,
+                haber=round(pago_interes, 2)
+            )
+            db.session.add(mov_int_deferred)
+
+            # Revertimos la Ganancia Real (Debe: ya no es ganancia)
+            mov_int_income = MovimientoContable(
+                id_asiento=asiento.id_asiento,
+                cuenta='Ganancias por Intereses',
+                debe=round(pago_interes, 2),
+                haber=0
+            )
+            db.session.add(mov_int_income)
+
+        db.session.commit()
+
+        # 5. Registrar Auditoría
+        try:
+            audit = PagoAudit(
+                id_pago=pago.id_pago,
+                id_usuario=user_id,
+                accion='ANULACION',
+                monto_registrado=monto,
+                id_detalle_credito=pago.id_detalle_credito,
+                estado_pago_momento='ANULADO',
+                direccion_ip=request.remote_addr,
+                observacion="Anulación de pago realizada por el usuario."
+            )
+            db.session.add(audit)
+            db.session.commit()
+        except Exception as audit_err:
+            print(f"Error en auditoría (no bloqueante): {audit_err}")
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": "Error anulando pago", "error": str(e)}), 500
+
+@bp.get("/auditoria")
+@jwt_required()
+def get_auditoria_pagos():
+    query = PagoAudit.query.order_by(PagoAudit.id_audit.desc()).all()
+    return jsonify([a.to_dict() for a in query]), 200

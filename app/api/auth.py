@@ -5,7 +5,7 @@ from flask_jwt_extended import (
     get_jwt_identity, get_jwt
 )
 from app.extensions import db, jwt  # usa las extensiones inicializadas
-from app.models.catalog import Usuario, Rol, Permiso, UsuarioRol
+from app.models.catalog import Usuario, Rol, Permiso, UsuarioRol, HistorialAcceso
 
 bp = Blueprint("auth", __name__)
 
@@ -39,11 +39,49 @@ def login():
     data = request.get_json() or {}
     username = data.get("username")
     password = data.get("password")
-    user = Usuario.query.filter_by(nombre_usuario=username).first()
     from werkzeug.security import check_password_hash
 
-    if not user or not check_password_hash(user.password_hash, password):
+    user = Usuario.query.filter_by(nombre_usuario=username).first()
+    ip_cliente = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+
+    if not user:
+        new_log = HistorialAcceso(
+            username_intentado=username,
+            evento='LOGIN_FALLIDO',
+            ip_cliente=ip_cliente,
+            user_agent=user_agent,
+            motivo_fallo='Usuario no encontrado'
+        )
+        db.session.add(new_log)
+        db.session.commit()
         return jsonify({"msg": "Credenciales inválidas"}), 401
+
+    if not check_password_hash(user.password_hash, password):
+        new_log = HistorialAcceso(
+            id_usuario=user.id_usuario,
+            username_intentado=username,
+            evento='LOGIN_FALLIDO',
+            ip_cliente=ip_cliente,
+            user_agent=user_agent,
+            motivo_fallo='Contraseña incorrecta'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        return jsonify({"msg": "Credenciales inválidas"}), 401
+
+    if user.estado != 'ACTIVO':
+        new_log = HistorialAcceso(
+            id_usuario=user.id_usuario,
+            username_intentado=username,
+            evento='LOGIN_FALLIDO',
+            ip_cliente=ip_cliente,
+            user_agent=user_agent,
+            motivo_fallo=f'Usuario con estado: {user.estado}'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        return jsonify({"msg": f"El usuario se encuentra {user.estado}"}), 403
 
     access  = create_access_token(identity=str(user.id_usuario))
     refresh = create_refresh_token(identity=str(user.id_usuario))
@@ -56,6 +94,17 @@ def login():
             if p.nombre not in permisos:
                 permisos.append(p.nombre)
 
+    # Registro de login exitoso
+    new_log = HistorialAcceso(
+        id_usuario=user.id_usuario,
+        username_intentado=username,
+        evento='LOGIN_EXITOSO',
+        ip_cliente=ip_cliente,
+        user_agent=user_agent
+    )
+    db.session.add(new_log)
+    db.session.commit()
+
     return jsonify({
         "access_token": access,
         "refresh_token": refresh,
@@ -64,6 +113,23 @@ def login():
         "user_permissions": permisos,
         "user_id": str(user.id_usuario),
     })
+
+@bp.post("/logout")
+@jwt_required()
+def logout():
+    user_id = get_jwt_identity()
+    user = Usuario.query.get(int(user_id))
+    
+    new_log = HistorialAcceso(
+        id_usuario=user.id_usuario if user else None,
+        username_intentado=user.nombre_usuario if user else None,
+        evento='LOGOUT',
+        ip_cliente=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(new_log)
+    db.session.commit()
+    return jsonify({"msg": "Sesión cerrada correctamente"}), 200
 
 @bp.post("/refresh")
 @jwt_required(refresh=True)

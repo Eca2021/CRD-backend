@@ -1,0 +1,6 @@
+Intentando importar...
+ERROR:
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\diag.py", line 10, in <module>
+    from app.models.catalog import MovimientoAdmin
+ImportError: cannot import name 'MovimientoAdmin' from 'app.models.catalog' (D:\PROYECTOS\CreditoSquid\CRD-backend\app\models\catalog.py)

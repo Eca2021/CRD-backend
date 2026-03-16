@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.extensions import db
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
-from app.models.catalog import Credito, DetalleCredito, TasaInteres, Cliente, Usuario, AsientoContable, MovimientoContable
+from app.models.catalog import Credito, DetalleCredito, TasaInteres, Cliente, Usuario, AsientoContable, MovimientoContable, ReglaCredito
 
 bp = Blueprint("creditos", __name__)
 
@@ -36,7 +36,7 @@ def permission_required(permission_name):
         return decorated
     return wrapper
 
-def calculate_plan(monto, cuotas, tasa_porcentaje, fecha_primer_pago=None):
+def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_primer_pago=None):
     # Modelo de Negocio "José":
     # 1. Interés Total = Monto * (Tasa / 100)
     # 2. Deuda Final = Monto + Interés Total
@@ -69,8 +69,8 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, fecha_primer_pago=None):
     for i in range(cuotas):
         # i arranca en 0. 
         # Cuota 1 (i=0) -> fecha_inicio + 0 días
-        # Cuota 2 (i=1) -> fecha_inicio + 7 días
-        vencimiento = fecha_inicio + timedelta(days=7 * i)
+        # Cuota 2 (i=1) -> fecha_inicio + dias_intervalo días
+        vencimiento = fecha_inicio + timedelta(days=dias_intervalo * i)
         
         plan.append({
             "numero_cuota": i + 1,
@@ -98,19 +98,23 @@ def preview_credito():
     try:
         monto = float(data.get("monto", 0))
         cuotas = int(data.get("cuotas", 0))
-        id_tasa = data.get("id_tasa")
+        id_regla = data.get("id_regla")
         fecha_primer_pago = data.get("fecha_primer_pago") # Opcional, formato YYYY-MM-DD
     except:
          return jsonify({"message": "Datos numéricos inválidos"}), 400
 
-    tasa = TasaInteres.query.get(id_tasa)
+    regla = ReglaCredito.query.get(id_regla)
+    if not regla:
+        return jsonify({"message": "Regla no encontrada"}), 404
+        
+    tasa = regla.tasa
     if not tasa:
-        return jsonify({"message": "Tasa no encontrada"}), 404
+        return jsonify({"message": "Tasa no asociada a la regla"}), 404
         
     if monto <= 0 or cuotas <= 0:
         return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
         
-    result = calculate_plan(monto, cuotas, tasa.porcentaje, fecha_primer_pago)
+    result = calculate_plan(monto, cuotas, tasa.porcentaje, regla.dias_intervalo, fecha_primer_pago)
     return jsonify(result), 200
 
 @bp.post("/")
@@ -121,7 +125,7 @@ def create_credito():
     # Validate inputs
     try:
         id_cliente = data.get("id_cliente")
-        id_tasa = data.get("id_tasa")
+        id_regla = data.get("id_regla")
         monto = float(data.get("monto", 0))
         cuotas = int(data.get("cuotas", 0))
         fecha_primer_pago = data.get("fecha_primer_pago")
@@ -134,19 +138,23 @@ def create_credito():
     cliente = Cliente.query.get(id_cliente)
     if not cliente: return jsonify({"message": "Cliente no encontrado"}), 404
     
-    tasa = TasaInteres.query.get(id_tasa)
-    if not tasa: return jsonify({"message": "Tasa no encontrada"}), 404
+    regla = ReglaCredito.query.get(id_regla)
+    if not regla: return jsonify({"message": "Regla no encontrada"}), 404
+    
+    tasa = regla.tasa
+    if not tasa: return jsonify({"message": "Tasa no asociada a la regla"}), 404
     
     user_id = get_jwt_identity()
     
     # Calculate
-    calc = calculate_plan(monto, cuotas, tasa.porcentaje, fecha_primer_pago)
+    calc = calculate_plan(monto, cuotas, tasa.porcentaje, regla.dias_intervalo, fecha_primer_pago)
     
     # Create Entities
     nuevo_credito = Credito(
         id_cliente=id_cliente,
         id_usuario=user_id,
-        id_tasa=id_tasa,
+        id_tasa=tasa.id_tasa,
+        id_regla=id_regla,
         monto_solicitado=monto,
         monto_total_a_pagar=calc["monto_total"],
         cantidad_cuotas=cuotas,

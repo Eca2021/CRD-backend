@@ -9,6 +9,9 @@ class BaseConfig:
         "https://sistema-pos-25.vercel.app"
     ]
     JSON_SORT_KEYS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {"options": "-c client_encoding=utf8"}
+    }
 
 class DevConfig(BaseConfig):
     DEBUG = True
