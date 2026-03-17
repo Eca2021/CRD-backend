@@ -17,11 +17,19 @@ def get_dashboard_summary():
     try:
         today = date.today()
         
-        # 1. Capital Disponible: (Capital Inicial) + (Capital Recuperado) - (Capital Prestado) - (Retiros Socios)
-        # Capital Inicial: Inyecciones de capital
-        capital_inyectado = db.session.query(
+        # 1. Capital Disponible: (Capital Inyectado Admin + Capital Contable) + (Capital Recuperado) - (Capital Prestado) - (Retiros Socios)
+        # Capital Inyectado Admin: Movimientos manuales legacy
+        capital_admin = db.session.query(
             func.coalesce(func.sum(MovimientoAdmin.monto), 0)
         ).filter(MovimientoAdmin.tipo == 'INYECCION').scalar()
+
+        # Capital Contable: Aportes registrados por el Módulo Contable (Haber - Debe para cuenta Capital)
+        capital_contable = db.session.query(
+            func.coalesce(func.sum(MovimientoContable.haber - MovimientoContable.debe), 0)
+        ).filter(MovimientoContable.cuenta == 'Capital Propio').scalar()
+
+        # Capital Inyectado Total
+        capital_inyectado = float(capital_admin) + float(capital_contable)
 
         # Capital Recuperado: Suma de capital_cuota de cuotas PAGADAS
         capital_recuperado = db.session.query(

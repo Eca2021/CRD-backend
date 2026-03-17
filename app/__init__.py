@@ -36,6 +36,7 @@ def create_app():
         app,
         resources={r"/api/*": {"origins": [
             "http://localhost:3000",
+            "http://localhost:3001",
             "https://sistema-pos-25.vercel.app",
         ]}},
         supports_credentials=True,

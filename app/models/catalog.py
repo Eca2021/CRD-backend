@@ -185,20 +185,16 @@ class ReglaCredito(db.Model):
     id_regla = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(20), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
-    id_tasa = db.Column(db.Integer, db.ForeignKey('tasas_interes.id_tasa'), nullable=False)
+    porcentaje = db.Column(db.Numeric, nullable=False)
     dias_intervalo = db.Column(db.Integer, nullable=False)
     activo = db.Column(db.Boolean, default=True)
-
-    tasa = db.relationship('TasaInteres', backref='reglas')
 
     def to_dict(self):
         return {
             'id_regla': self.id_regla,
             'codigo': self.codigo,
             'nombre': self.nombre,
-            'id_tasa': self.id_tasa,
-            'tasa_nombre': self.tasa.nombre_tasa if self.tasa else None,
-            'tasa_porcentaje': float(self.tasa.porcentaje) if self.tasa else 0,
+            'porcentaje': float(self.porcentaje),
             'dias_intervalo': self.dias_intervalo,
             'activo': self.activo
         }
@@ -208,8 +204,7 @@ class Credito(db.Model):
     id_credito = db.Column(db.Integer, primary_key=True)
     id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente'), nullable=False)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False)
-    id_tasa = db.Column(db.Integer, db.ForeignKey('tasas_interes.id_tasa'), nullable=False)
-    id_regla = db.Column(db.Integer, db.ForeignKey('reglas_credito.id_regla'), nullable=True) # Nuevo
+    id_regla = db.Column(db.Integer, db.ForeignKey('reglas_credito.id_regla'), nullable=False)
     monto_solicitado = db.Column(db.Numeric, nullable=False)
     monto_total_a_pagar = db.Column(db.Numeric, nullable=False)
     cantidad_cuotas = db.Column(db.Integer, nullable=False)
@@ -218,8 +213,7 @@ class Credito(db.Model):
 
     cliente = db.relationship('Cliente', backref='creditos')
     usuario = db.relationship('Usuario', backref='creditos_otorgados')
-    tasa = db.relationship('TasaInteres', backref='creditos')
-    regla = db.relationship('ReglaCredito', backref='creditos') # Nuevo
+    regla = db.relationship('ReglaCredito', backref='creditos')
     detalles = db.relationship('DetalleCredito', backref='credito', cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -229,10 +223,9 @@ class Credito(db.Model):
             'cliente_nombre': f"{self.cliente.nombre} {self.cliente.apellido}" if self.cliente else None,
             'id_usuario': self.id_usuario,
             'usuario_nombre': self.usuario.nombre_usuario if self.usuario else None,
-            'id_tasa': self.id_tasa,
-            'tasa_nombre': self.tasa.nombre_tasa if self.tasa else None,
             'id_regla': self.id_regla,
             'regla_nombre': self.regla.nombre if self.regla else None,
+            'regla_porcentaje': float(self.regla.porcentaje) if self.regla else 0,
             'monto_solicitado': float(self.monto_solicitado),
             'monto_total_a_pagar': float(self.monto_total_a_pagar),
             'cantidad_cuotas': self.cantidad_cuotas,

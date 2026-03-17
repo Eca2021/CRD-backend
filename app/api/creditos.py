@@ -36,11 +36,10 @@ def permission_required(permission_name):
         return decorated
     return wrapper
 
-def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_primer_pago=None):
+def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_primer_pago=None, usar_redondeo=False, monto_redondeado=0):
     # Modelo de Negocio "José":
     # 1. Interés Total = Monto * (Tasa / 100)
     # 2. Deuda Final = Monto + Interés Total
-    # 3. Cuotas fijas semanales
     
     monto = float(monto)
     cuotas = int(cuotas)
@@ -49,10 +48,8 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
     interes_total = monto * (tasa_val / 100.0)
     deuda_total = monto + interes_total
     
-    # Desglose por cuota
-    capital_por_cuota = monto / cuotas
-    interes_por_cuota = interes_total / cuotas
-    cuota_val = deuda_total / cuotas
+    # Desglose por cuota estándar o redondeada
+    interes_por_cuota_fijo = interes_total / cuotas
     
     plan = []
     
@@ -63,23 +60,53 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
         else:
             fecha_inicio = fecha_primer_pago
     else:
-        # Por defecto, una semana desde hoy si no se especifica
         fecha_inicio = date.today() + timedelta(days=7)
     
-    for i in range(cuotas):
-        # i arranca en 0. 
-        # Cuota 1 (i=0) -> fecha_inicio + 0 días
-        # Cuota 2 (i=1) -> fecha_inicio + dias_intervalo días
-        vencimiento = fecha_inicio + timedelta(days=dias_intervalo * i)
+    acumulado_total = 0
+    
+    if usar_redondeo and monto_redondeado > 0:
+        # Lógica de Redondeo: Cuotas 2 a N son fijas. Cuota 1 absorbe el residuo.
+        cuota_fija = float(monto_redondeado)
+        total_cuotas_2_a_n = cuota_fija * (cuotas - 1)
+        cuota_1 = deuda_total - total_cuotas_2_a_n
         
-        plan.append({
-            "numero_cuota": i + 1,
-            "monto_cuota": round(cuota_val, 2),
-            "capital_cuota": round(capital_por_cuota, 2),
-            "interes_cuota": round(interes_por_cuota, 2),
-            "cuota_total": round(cuota_val, 2),
-            "fecha_vencimiento": vencimiento.isoformat()
-        })
+        for i in range(cuotas):
+            vencimiento = fecha_inicio + timedelta(days=dias_intervalo * i)
+            
+            if i == 0:
+                val_c = cuota_1
+            else:
+                val_c = cuota_fija
+            
+            # El interés se mantiene proporcional
+            int_c = interes_por_cuota_fijo
+            cap_c = val_c - int_c
+            
+            plan.append({
+                "numero_cuota": i + 1,
+                "monto_cuota": round(val_c, 2),
+                "capital_cuota": round(cap_c, 2),
+                "interes_cuota": round(int_c, 2),
+                "cuota_total": round(val_c, 2),
+                "fecha_vencimiento": vencimiento.isoformat()
+            })
+        valor_cuota_ref = cuota_fija
+    else:
+        # Cálculo estándar
+        capital_por_cuota = monto / cuotas
+        cuota_val = deuda_total / cuotas
+        
+        for i in range(cuotas):
+            vencimiento = fecha_inicio + timedelta(days=dias_intervalo * i)
+            plan.append({
+                "numero_cuota": i + 1,
+                "monto_cuota": round(cuota_val, 2),
+                "capital_cuota": round(capital_por_cuota, 2),
+                "interes_cuota": round(interes_por_cuota_fijo, 2),
+                "cuota_total": round(cuota_val, 2),
+                "fecha_vencimiento": vencimiento.isoformat()
+            })
+        valor_cuota_ref = cuota_val
         
     return {
         "monto_solicitado": round(monto, 2),
@@ -87,7 +114,7 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
         "interes_total": round(interes_total, 2),
         "monto_total": round(deuda_total, 2),
         "cuotas": cuotas,
-        "valor_cuota": round(cuota_val, 2),
+        "valor_cuota": round(valor_cuota_ref, 2),
         "plan": plan
     }
 
@@ -96,25 +123,23 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
 def preview_credito():
     data = request.get_json() or {}
     try:
-        monto = float(data.get("monto", 0))
-        cuotas = int(data.get("cuotas", 0))
+        monto = float(data.get("monto") or 0)
+        cuotas = int(data.get("cuotas") or 0)
         id_regla = data.get("id_regla")
-        fecha_primer_pago = data.get("fecha_primer_pago") # Opcional, formato YYYY-MM-DD
-    except:
+        fecha_primer_pago = data.get("fecha_primer_pago")
+        usar_redondeo = data.get("usar_redondeo", False)
+        monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
+    except (ValueError, TypeError):
          return jsonify({"message": "Datos numéricos inválidos"}), 400
 
     regla = ReglaCredito.query.get(id_regla)
     if not regla:
         return jsonify({"message": "Regla no encontrada"}), 404
         
-    tasa = regla.tasa
-    if not tasa:
-        return jsonify({"message": "Tasa no asociada a la regla"}), 404
-        
     if monto <= 0 or cuotas <= 0:
         return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
         
-    result = calculate_plan(monto, cuotas, tasa.porcentaje, regla.dias_intervalo, fecha_primer_pago)
+    result = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
     return jsonify(result), 200
 
 @bp.post("/")
@@ -126,12 +151,14 @@ def create_credito():
     try:
         id_cliente = data.get("id_cliente")
         id_regla = data.get("id_regla")
-        monto = float(data.get("monto", 0))
-        cuotas = int(data.get("cuotas", 0))
+        monto = float(data.get("monto") or 0)
+        cuotas = int(data.get("cuotas") or 0)
         fecha_primer_pago = data.get("fecha_primer_pago")
-    except:
+        usar_redondeo = data.get("usar_redondeo", False)
+        monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
+    except (ValueError, TypeError):
         return jsonify({"message": "Datos inválidos"}), 400
-        
+
     if monto <= 0 or cuotas <= 0:
         return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
         
@@ -141,19 +168,15 @@ def create_credito():
     regla = ReglaCredito.query.get(id_regla)
     if not regla: return jsonify({"message": "Regla no encontrada"}), 404
     
-    tasa = regla.tasa
-    if not tasa: return jsonify({"message": "Tasa no asociada a la regla"}), 404
-    
     user_id = get_jwt_identity()
     
     # Calculate
-    calc = calculate_plan(monto, cuotas, tasa.porcentaje, regla.dias_intervalo, fecha_primer_pago)
+    calc = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
     
     # Create Entities
     nuevo_credito = Credito(
         id_cliente=id_cliente,
         id_usuario=user_id,
-        id_tasa=tasa.id_tasa,
         id_regla=id_regla,
         monto_solicitado=monto,
         monto_total_a_pagar=calc["monto_total"],

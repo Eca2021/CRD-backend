@@ -47,18 +47,18 @@ def create_regla():
     try:
         codigo = data.get("codigo")
         nombre = data.get("nombre")
-        id_tasa = data.get("id_tasa")
+        porcentaje = float(data.get("porcentaje"))
         dias_intervalo = int(data.get("dias_intervalo", 7))
     except:
         return jsonify({"message": "Datos inválidos"}), 400
         
-    if not codigo or not nombre or not id_tasa:
+    if not codigo or not nombre or porcentaje is None:
         return jsonify({"message": "Faltan campos obligatorios"}), 400
         
     nueva = ReglaCredito(
         codigo=codigo,
         nombre=nombre,
-        id_tasa=id_tasa,
+        porcentaje=porcentaje,
         dias_intervalo=dias_intervalo
     )
     
@@ -80,7 +80,8 @@ def update_regla(id_regla):
     data = request.get_json() or {}
     regla.nombre = data.get("nombre", regla.nombre)
     regla.codigo = data.get("codigo", regla.codigo)
-    regla.id_tasa = data.get("id_tasa", regla.id_tasa)
+    if "porcentaje" in data:
+        regla.porcentaje = float(data.get("porcentaje"))
     regla.dias_intervalo = data.get("dias_intervalo", regla.dias_intervalo)
     regla.activo = data.get("activo", regla.activo)
     
