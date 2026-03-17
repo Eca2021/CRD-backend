@@ -268,7 +268,7 @@ def anular_credito(id_credito):
         return jsonify({"message": "El crédito ya está anulado"}), 400
 
     # Validar pagos
-    total_pagado = sum(d.monto_pagado for d in credito.detalles)
+    total_pagado = sum((d.monto_pagado or 0) for d in credito.detalles)
     if total_pagado > 0:
         return jsonify({"message": "No se puede anular un crédito con pagos registrados. Anule los pagos primero."}), 400
 

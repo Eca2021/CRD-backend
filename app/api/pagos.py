@@ -20,10 +20,17 @@ def registrar_pago():
     try:
         id_detalle = data.get("id_detalle_credito")
         id_forma = data.get("id_forma_pago")
-        monto = float(data.get("monto_pagado", 0))
+        # Robust parsing for monto
+        raw_monto = data.get("monto_pagado")
+        if raw_monto is None or str(raw_monto).strip() == "":
+            monto = 0.0
+        else:
+            monto = float(raw_monto)
         comprobante = data.get("comprobante_nro")
-    except:
-        return jsonify({"message": "Datos inválidos"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"message": "Formato de monto inválido", "error": "Invalid numeric format"}), 400
+    except Exception as e:
+        return jsonify({"message": "Error al procesar datos", "error": str(e)}), 400
 
     if monto <= 0:
         return jsonify({"message": "El monto debe ser mayor a 0"}), 400
@@ -39,7 +46,7 @@ def registrar_pago():
         return jsonify({"message": "Forma de pago no encontrada"}), 404
         
     # Validar que no pague de más (opcional, pero recomendado)
-    saldo_pendiente = float(detalle.monto_cuota) - float(detalle.monto_pagado)
+    saldo_pendiente = float(detalle.monto_cuota or 0) - float(detalle.monto_pagado or 0)
     # Permitemos pagar lo que sea, pero si supera, el estado será PAGADO igual.
     # Podríamos validar: if monto > saldo_pendiente: return error...
     
@@ -142,29 +149,27 @@ def registrar_pago():
         
     # ---------------------------------------------------------
     
-    # Actualizar Detalle
-    detalle.monto_pagado = float(detalle.monto_pagado) + monto
-    if detalle.monto_pagado >= float(detalle.monto_cuota):
-        detalle.estado_cuota = 'PAGADO'
-    
-    # Verificar si el Crédito se paga por completo
-    credito = Credito.query.get(detalle.id_credito)
-    all_detalles = DetalleCredito.query.filter_by(id_credito=credito.id_credito).all()
-    
-    # Si TODAS las cuotas están PAGADAS -> Crédito PAGADO
-    # Ojo: acabamos de actualizar 'detalle' en session, así que all_detalles (si es query fresca) 
-    # podría no tener el cambio si no hacemos flush, pero como es el mismo objeto en identidad SQLAlchemy, debería estar bien.
-    # Para estar seguros, verificamos lógica:
-    
-    todas_pagadas = True
-    for d in all_detalles:
-        # Usamos los valores actuales (incluyendo el cambio en 'detalle')
-        if d.estado_cuota != 'PAGADO':
-            todas_pagadas = False
-            break
-            
-    if todas_pagadas:
-        credito.estado = 'PAGADO'
+    try:
+        # Actualizar Detalle
+        detalle.monto_pagado = float(detalle.monto_pagado or 0) + monto
+        if detalle.monto_pagado >= float(detalle.monto_cuota or 0):
+            detalle.estado_cuota = 'PAGADO'
+        
+        # Verificar si el Crédito se paga por completo
+        credito = Credito.query.get(detalle.id_credito)
+        all_detalles = DetalleCredito.query.filter_by(id_credito=credito.id_credito).all()
+        
+        todas_pagadas = True
+        for d in all_detalles:
+            if d.estado_cuota != 'PAGADO':
+                todas_pagadas = False
+                break
+                
+        if todas_pagadas:
+            credito.estado = 'PAGADO'
+    except Exception as update_err:
+        db.session.rollback()
+        return jsonify({"message": "Error al actualizar estados de cuota/crédito", "error": str(update_err)}), 500
 
     try:
         db.session.commit()
@@ -216,7 +221,7 @@ def anular_pago(id_pago):
     credito = Credito.query.get(detalle.id_credito)
     forma = FormaPago.query.get(pago.id_forma_pago)
     
-    monto = float(pago.monto_pagado)
+    monto = float(pago.monto_pagado or 0)
     user_id = get_jwt_identity()
 
     try:
@@ -224,8 +229,8 @@ def anular_pago(id_pago):
         pago.estado = 'ANULADO'
         
         # 2. Revertir montos en el Detalle
-        detalle.monto_pagado = float(detalle.monto_pagado) - monto
-        if detalle.estado_cuota == 'PAGADO' and detalle.monto_pagado < float(detalle.monto_cuota):
+        detalle.monto_pagado = float(detalle.monto_pagado or 0) - monto
+        if detalle.estado_cuota == 'PAGADO' and detalle.monto_pagado < float(detalle.monto_cuota or 0):
             detalle.estado_cuota = 'PENDIENTE'
             
         # 3. Revertir estado del Crédito
