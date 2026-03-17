@@ -15,7 +15,9 @@ def get_formas_pago():
 @bp.post("/")
 @jwt_required()
 def registrar_pago():
+    print(">>> ¡PETICIÓN RECIBIDA EN /PAGOS/! <<<") # Sensor
     data = request.get_json() or {}
+    print(f">>> Datos recibidos: {data}")          # Sensor de datos
     
     try:
         id_detalle = data.get("id_detalle_credito")
