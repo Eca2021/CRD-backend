@@ -226,6 +226,7 @@ class Credito(db.Model):
             'id_regla': self.id_regla,
             'regla_nombre': self.regla.nombre if self.regla else None,
             'regla_porcentaje': float(self.regla.porcentaje) if self.regla else 0,
+            'tasa_nombre': self.regla.nombre if self.regla else "N/A", # Compatibilidad con el frontend viejo
             'monto_solicitado': float(self.monto_solicitado),
             'monto_total_a_pagar': float(self.monto_total_a_pagar),
             'cantidad_cuotas': self.cantidad_cuotas,
@@ -259,6 +260,7 @@ class DetalleCredito(db.Model):
             'capital_cuota': float(self.capital_cuota) if self.capital_cuota else 0,
             'interes_cuota': float(self.interes_cuota) if self.interes_cuota else 0,
             'cuota_total': float(self.cuota_total) if self.cuota_total else 0,
+            'tasa_nombre': self.credito.regla.nombre if self.credito and self.credito.regla else "N/A", # Compat
             'pagos': [p.to_dict() for p in self.pagos if p.estado == 'ACTIVO']
         }
 

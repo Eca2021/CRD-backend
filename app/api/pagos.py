@@ -37,32 +37,38 @@ def registrar_pago():
     if monto <= 0:
         return jsonify({"message": "El monto debe ser mayor a 0"}), 400
 
-    detalle = DetalleCredito.query.get(id_detalle)
-    if not detalle:
-        return jsonify({"message": "Cuota no encontrada"}), 404
-
-    credito = Credito.query.get(detalle.id_credito)
-
-    forma = FormaPago.query.get(id_forma)
-    if not forma:
-        return jsonify({"message": "Forma de pago no encontrada"}), 404
-        
-    # Validar que no pague de más (opcional, pero recomendado)
-    saldo_pendiente = float(detalle.monto_cuota or 0) - float(detalle.monto_pagado or 0)
-    # Permitemos pagar lo que sea, pero si supera, el estado será PAGADO igual.
-    # Podríamos validar: if monto > saldo_pendiente: return error...
+    print(f">>> Analizando pago para Detalle #{id_detalle}, Forma #{id_forma}, Monto {monto}")
     
-    # Registrar Pago
-    user_id = get_jwt_identity()
-    nuevo_pago = Pago(
-        id_detalle_credito=id_detalle,
-        id_forma_pago=id_forma,
-        id_usuario=user_id,
-        monto_pagado=monto,
-        fecha_pago=datetime.now(),
-        comprobante_nro=comprobante
-    )
-    db.session.add(nuevo_pago)
+    try:
+        detalle = DetalleCredito.query.get(id_detalle)
+        if not detalle:
+            print(f">>> ERROR: Cuota #{id_detalle} no encontrada")
+            return jsonify({"message": "Cuota no encontrada"}), 404
+
+        credito = Credito.query.get(detalle.id_credito)
+        print(f">>> Crédito asociado: #{credito.id_credito if credito else 'N/A'}")
+
+        forma = FormaPago.query.get(id_forma)
+        if not forma:
+            print(f">>> ERROR: Forma de pago #{id_forma} no encontrada")
+            return jsonify({"message": "Forma de pago no encontrada"}), 404
+            
+        # Registrar Pago
+        user_id = get_jwt_identity()
+        nuevo_pago = Pago(
+            id_detalle_credito=id_detalle,
+            id_forma_pago=id_forma,
+            id_usuario=user_id,
+            monto_pagado=monto,
+            fecha_pago=datetime.now(),
+            comprobante_nro=comprobante
+        )
+        db.session.add(nuevo_pago)
+        print(">>> Pago agregado a la sesión")
+    except Exception as e:
+        print(f">>> ERROR AL INICIAR PAGO: {str(e)}")
+        db.session.rollback()
+        return jsonify({"message": "Error al iniciar proceso de pago", "error": str(e)}), 500
     
     # ---------------------------------------------------------
     # Generación de Asiento Contable Automático
@@ -144,8 +150,9 @@ def registrar_pago():
             db.session.add(mov_int_income)
             
     except Exception as e:
-        # Si falla la contabilidad, ¿fallamos todo el pago? 
-        # Generalmente sí para mantener integridad.
+        print(f">>> ERROR CRÍTICO CONTABILIDAD: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return jsonify({"message": "Error generando contabilidad", "error": str(e)}), 500
         
@@ -170,6 +177,7 @@ def registrar_pago():
         if todas_pagadas:
             credito.estado = 'PAGADO'
     except Exception as update_err:
+        print(f">>> ERROR ACTUALIZANDO ESTADOS: {str(update_err)}")
         db.session.rollback()
         return jsonify({"message": "Error al actualizar estados de cuota/crédito", "error": str(update_err)}), 500
 
@@ -195,6 +203,7 @@ def registrar_pago():
 
         return jsonify({"message": "Pago registrado exitosamente", "pago": nuevo_pago.to_dict()}), 201
     except Exception as e:
+        print(f">>> ERROR FINAL COMMIT: {str(e)}")
         db.session.rollback()
         return jsonify({"message": "Error registrando pago", "error": str(e)}), 500
 @bp.get("/")
