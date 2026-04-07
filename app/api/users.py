@@ -77,11 +77,22 @@ def create_user():
     
     # --- Manejo de Multi-Tenant y Seguridad ---
     id_empresa_target = claims.get("id_empresa")
-    if is_super and data.get("id_empresa"):
-        id_empresa_target = data.get("id_empresa")
-    elif not is_super:
-        # Los administradores locales solo pueden crear usuarios en su propia empresa
-        id_empresa_target = claims.get("id_empresa")
+    
+    if is_super:
+        # Los SuperAdmins pueden elegir empresa o dejarla NULL (Global)
+        id_empresa_target = data.get("id_empresa") if "id_empresa" in data else None
+    else:
+        # Los administradores locales están anclados a su empresa obligatoriamente
+        if id_empresa_target is None:
+            return jsonify({"message": "Error de configuración: Administrador local sin empresa asignada"}), 400
+            
+    # [BLOQUEO] Un usuario regular NUNCA puede ser creado sin empresa (NULL)
+    # Buscamos si el rol SuperAdmin está en la lista de roles a asignar
+    super_admin_role = Rol.query.filter(func.lower(Rol.nombre) == 'superadmin').first()
+    is_target_super = super_admin_role and roles_ids and super_admin_role.id_rol in roles_ids
+    
+    if not is_target_super and id_empresa_target is None:
+         return jsonify({"message": "El ID de empresa es obligatorio para usuarios regulares"}), 400
 
     # [SEGURIDAD] Bloquear asignación de SuperAdmin por no-superadmins
     if not is_super and roles_ids:
