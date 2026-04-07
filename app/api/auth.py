@@ -123,7 +123,8 @@ def login():
         "user_permissions": permisos,
         "user_id": str(user.id_usuario),
         "id_empresa": user.id_empresa,
-        "empresa_nombre": user.empresa.nombre if user.empresa else None
+        "empresa_nombre": user.empresa.nombre if user.empresa else None,
+        "is_global": getattr(user, 'is_global', False)
     })
 
 @bp.post("/logout")
@@ -158,7 +159,8 @@ def register_jwt_callbacks(jwt_manager):
         user = Usuario.query.filter_by(id_usuario=int(identity)).first()
         roles = [ur.rol.nombre for ur in user.roles] if user else []
         id_empresa = user.id_empresa if user else None
-        return {"roles": roles, "id_empresa": id_empresa}
+        is_global = getattr(user, 'is_global', False)
+        return {"roles": roles, "id_empresa": id_empresa, "is_global": is_global}
 
     @jwt_manager.user_lookup_loader
     def user_lookup_callback(jwt_header, jwt_data):

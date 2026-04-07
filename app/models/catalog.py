@@ -37,6 +37,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(100), unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
     estado = db.Column(db.String(20), nullable=False, default='ACTIVO')
+    is_global = db.Column(db.Boolean, default=False, server_default='false')
     created_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp())
     updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
     
@@ -50,6 +51,7 @@ class Usuario(db.Model):
             'id_usuario': self.id_usuario,
             'id_empresa': self.id_empresa,
             'empresa_nombre': self.empresa.nombre if self.empresa else 'Acceso Global',
+            'is_global': self.is_global,
             'nombre_usuario': self.nombre_usuario,
             'nombre': self.nombre,
             'email': self.email,

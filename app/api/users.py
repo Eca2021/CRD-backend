@@ -22,8 +22,8 @@ def roles_required(required_roles):
             claims = get_jwt() or {}
             roles = [r.upper() for r in (claims.get("roles", []) or [])]
             
-            # SuperAdmin bypass: siempre tiene acceso total
-            if "SUPERADMIN" in roles:
+            # Sistema de Alcance (Scope): Si el usuario es GLOBAL, tiene acceso total
+            if claims.get("is_global") is True:
                 return fn(*args, **kwargs)
                 
             required_upper = [r.upper() for r in required_roles]
@@ -47,6 +47,7 @@ def _user_to_dict(u: Usuario):
         "nombre": u.nombre,
         "email": u.email,
         "estado": u.estado,
+        "is_global": getattr(u, "is_global", False),
         "roles": role_ids,  # ids; el front ya los mapea a nombres
     }
 
@@ -67,38 +68,27 @@ def create_user():
     password = data.get("password")
     estado = (data.get("estado") or "ACTIVO").strip()
     roles_ids = data.get("roles", []) or []
+    is_global_target = data.get("is_global", False)
 
-    # Manejo de multi-tenant:
-    # Por defecto, el usuario se crea en la empresa del administrador que lo crea.
-    # Si es un SuperAdmin, puede elegir la empresa en el payload (data.get('id_empresa')).
+    # El creador es 'super' si es GLOBAL en sus claims
     claims = get_jwt()
-    current_user_roles = [r.upper() for r in (claims.get("roles", []) or [])]
-    is_super = "SUPERADMIN" in current_user_roles and claims.get("id_empresa") is None
+    is_super = claims.get("is_global") is True
     
     # --- Manejo de Multi-Tenant y Seguridad ---
     id_empresa_target = claims.get("id_empresa")
     
     if is_super:
-        # Los SuperAdmins pueden elegir empresa o dejarla NULL (Global)
+        # Los Administradores Globales pueden elegir empresa o dejarla NULL
         id_empresa_target = data.get("id_empresa") if "id_empresa" in data else None
     else:
         # Los administradores locales están anclados a su empresa obligatoriamente
+        is_global_target = False # No pueden crear globales
         if id_empresa_target is None:
             return jsonify({"message": "Error de configuración: Administrador local sin empresa asignada"}), 400
             
-    # [BLOQUEO] Un usuario regular NUNCA puede ser creado sin empresa (NULL)
-    # Buscamos si el rol SuperAdmin está en la lista de roles a asignar
-    super_admin_role = Rol.query.filter(func.lower(Rol.nombre) == 'superadmin').first()
-    is_target_super = super_admin_role and roles_ids and super_admin_role.id_rol in roles_ids
-    
-    if not is_target_super and id_empresa_target is None:
-         return jsonify({"message": "El ID de empresa es obligatorio para usuarios regulares"}), 400
-
-    # [SEGURIDAD] Bloquear asignación de SuperAdmin por no-superadmins
-    if not is_super and roles_ids:
-        super_admin_role = Rol.query.filter(func.lower(Rol.nombre) == 'superadmin').first()
-        if super_admin_role and super_admin_role.id_rol in roles_ids:
-            return jsonify({"message": "No tienes permiso para asignar el rol SuperAdmin"}), 403
+    # [BLOQUEO SEGURIDAD] Un usuario regular NUNCA puede ser GLOBAL
+    if not is_super and is_global_target:
+         return jsonify({"message": "No tienes permiso para crear usuarios globales"}), 403
 
     if not nombre_usuario or not password:
         return jsonify({"message": "Nombre de usuario y contraseña son requeridos"}), 400
@@ -129,6 +119,7 @@ def create_user():
             email=email,
             password_hash=hashed_password,
             estado=estado,
+            is_global=is_global_target
         )
         db.session.add(nuevo)
         db.session.flush()  # genera id_usuario
