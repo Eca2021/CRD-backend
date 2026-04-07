@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 # usa SIEMPRE las instancias compartidas desde app.extensions
 from app.extensions import db, jwt, cors, migrate
+from app.utils.seed import seed_db
 
 
 def create_app():
@@ -32,13 +33,23 @@ def create_app():
     )
 
     # 4) CORS
+    # Permitir orígenes dinámicos desde .env + fallback seguro
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://187.77.37.231",
+        "http://187.77.37.231:3000",
+        "https://sistema-pos-25.vercel.app"
+    ]
+    
+    env_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+    if env_origins:
+        allowed_origins.extend([o.strip() for o in env_origins.split(",")])
+
     cors.init_app(
         app,
-        resources={r"/api/*": {"origins": [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://sistema-pos-25.vercel.app",
-        ]}},
+        resources={r"/api/*": {"origins": list(set(allowed_origins))}},
         supports_credentials=True,
     )
 
@@ -61,5 +72,7 @@ def create_app():
     # Debug: ver rutas cargadas
     with app.app_context():
         print(app.url_map)
+        # Inicialización automática de SuperAdmin
+        seed_db()
 
     return app

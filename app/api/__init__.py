@@ -20,6 +20,8 @@ def register_blueprints(app):
     from app.api.dashboard import bp as dashboard_bp
     from app.api.reglas import bp as reglas_bp
 
+    from app.api.empresas import bp as empresas_bp
+
 
     # ---- REGISTROS ----
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -34,3 +36,4 @@ def register_blueprints(app):
     app.register_blueprint(contabilidad_bp, url_prefix="/api/contabilidad")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(reglas_bp, url_prefix="/api/reglas")
+    app.register_blueprint(empresas_bp, url_prefix="/api/empresas")

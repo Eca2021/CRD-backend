@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.extensions import db
-from app.models.catalog import Pago, FormaPago, DetalleCredito, Credito, AsientoContable, MovimientoContable, PagoAudit
+from app.models.catalog import Pago, FormaPago, DetalleCredito, Credito, AsientoContable, MovimientoContable, PagoAudit, Cliente, Usuario
 from datetime import datetime
 
 bp = Blueprint("pagos", __name__)
@@ -9,7 +9,8 @@ bp = Blueprint("pagos", __name__)
 @bp.get("/formas_pago")
 @jwt_required()
 def get_formas_pago():
-    formas = FormaPago.query.all()
+    id_empresa = get_jwt().get("id_empresa")
+    formas = FormaPago.query.filter_by(id_empresa=id_empresa).all()
     return jsonify([f.to_dict() for f in formas]), 200
 
 @bp.post("/")
@@ -40,15 +41,20 @@ def registrar_pago():
     print(f">>> Analizando pago para Detalle #{id_detalle}, Forma #{id_forma}, Monto {monto}")
     
     try:
+        id_empresa = get_jwt().get("id_empresa")
         detalle = DetalleCredito.query.get(id_detalle)
         if not detalle:
             print(f">>> ERROR: Cuota #{id_detalle} no encontrada")
             return jsonify({"message": "Cuota no encontrada"}), 404
 
-        credito = Credito.query.get(detalle.id_credito)
+        credito = Credito.query.filter_by(id_credito=detalle.id_credito, id_empresa=id_empresa).first()
+        if not credito:
+             print(f">>> ERROR: Crédito #{detalle.id_credito} no pertenece a la empresa")
+             return jsonify({"message": "Crédito no encontrado o acceso denegado"}), 404
+        
         print(f">>> Crédito asociado: #{credito.id_credito if credito else 'N/A'}")
 
-        forma = FormaPago.query.get(id_forma)
+        forma = FormaPago.query.filter_by(id_forma_pago=id_forma, id_empresa=id_empresa).first()
         if not forma:
             print(f">>> ERROR: Forma de pago #{id_forma} no encontrada")
             return jsonify({"message": "Forma de pago no encontrada"}), 404
@@ -56,6 +62,7 @@ def registrar_pago():
         # Registrar Pago
         user_id = get_jwt_identity()
         nuevo_pago = Pago(
+            id_empresa=id_empresa,
             id_detalle_credito=id_detalle,
             id_forma_pago=id_forma,
             id_usuario=user_id,
@@ -78,6 +85,7 @@ def registrar_pago():
         
         # 1. Crear Asiento
         asiento = AsientoContable(
+            id_empresa=id_empresa,
             glosa=f"Pago de Cuota #{detalle.numero_cuota} - Crédito #{credito.id_credito} - {forma.nombre}",
             id_usuario=user_id,
             fecha=datetime.now()
@@ -113,6 +121,7 @@ def registrar_pago():
         # A) Entrada a CAJA (Debe: Total Pagado)
         mov_caja = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Caja',
             debe=monto,
             haber=0
@@ -123,6 +132,7 @@ def registrar_pago():
         # En el modelo "José", CxC nace con Capital + Interés. Al pagar, CxC baja.
         mov_cxp = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Cuentas por Cobrar',
             debe=0,
             haber=monto
@@ -134,6 +144,7 @@ def registrar_pago():
             # 1. Damos de baja el "Interés por Cobrar" (Pasivo Diferido) que creamos al inicio (Debe)
             mov_int_deferred = MovimientoContable(
                 id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
                 cuenta='Intereses por Cobrar',
                 debe=round(pago_interes, 2),
                 haber=0
@@ -143,6 +154,7 @@ def registrar_pago():
             # 2. Reconocemos la Ganancia Real (Haber)
             mov_int_income = MovimientoContable(
                 id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
                 cuenta='Ganancias por Intereses',
                 debe=0,
                 haber=round(pago_interes, 2)
@@ -187,6 +199,7 @@ def registrar_pago():
         # 4. Registrar Auditoría (después del commit para tener el id_pago final)
         try:
             audit = PagoAudit(
+                id_empresa=id_empresa,
                 id_pago=nuevo_pago.id_pago,
                 id_usuario=user_id,
                 accion='CREACION',
@@ -209,21 +222,24 @@ def registrar_pago():
 @bp.get("/")
 @jwt_required()
 def get_pagos():
-    pagos = Pago.query.order_by(Pago.id_pago.desc()).all()
+    id_empresa = get_jwt().get("id_empresa")
+    pagos = Pago.query.filter_by(id_empresa=id_empresa).order_by(Pago.id_pago.desc()).all()
     return jsonify([p.to_dict() for p in pagos]), 200
 
 @bp.get("/detalle/<int:id_detalle>")
 @jwt_required()
 def get_pagos_by_detalle(id_detalle):
-    pagos = Pago.query.filter_by(id_detalle_credito=id_detalle).order_by(Pago.id_pago.desc()).all()
+    id_empresa = get_jwt().get("id_empresa")
+    pagos = Pago.query.filter_by(id_detalle_credito=id_detalle, id_empresa=id_empresa).order_by(Pago.id_pago.desc()).all()
     return jsonify([p.to_dict() for p in pagos]), 200
 
 @bp.post("/<int:id_pago>/anular")
 @jwt_required()
 def anular_pago(id_pago):
-    pago = Pago.query.get(id_pago)
+    id_empresa = get_jwt().get("id_empresa")
+    pago = Pago.query.filter_by(id_pago=id_pago, id_empresa=id_empresa).first()
     if not pago:
-        return jsonify({"message": "Pago no encontrado"}), 404
+        return jsonify({"message": "Pago no encontrado o acceso denegado"}), 404
 
     if pago.estado == 'ANULADO':
         return jsonify({"message": "El pago ya está anulado"}), 400
@@ -250,6 +266,7 @@ def anular_pago(id_pago):
             
         # 4. Asiento Contable de Reversión
         asiento = AsientoContable(
+            id_empresa=id_empresa,
             glosa=f"REVERSIÓN Pago #{pago.id_pago} - Cuota #{detalle.numero_cuota} - Crédito #{credito.id_credito}",
             id_usuario=user_id,
             fecha=datetime.now()
@@ -270,6 +287,7 @@ def anular_pago(id_pago):
         # A) SALIDA de CAJA (Haber)
         mov_caja = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Caja',
             debe=0,
             haber=monto
@@ -279,6 +297,7 @@ def anular_pago(id_pago):
         # B) REPOSICIÓN de CUENTAS POR COBRAR (Debe)
         mov_cxc = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Cuentas por Cobrar',
             debe=monto,
             haber=0
@@ -290,6 +309,7 @@ def anular_pago(id_pago):
             # Revertimos el Pasivo Diferido (Haber: vuelve a estar por cobrar)
             mov_int_deferred = MovimientoContable(
                 id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
                 cuenta='Intereses por Cobrar',
                 debe=0,
                 haber=round(pago_interes, 2)
@@ -299,6 +319,7 @@ def anular_pago(id_pago):
             # Revertimos la Ganancia Real (Debe: ya no es ganancia)
             mov_int_income = MovimientoContable(
                 id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
                 cuenta='Ganancias por Intereses',
                 debe=round(pago_interes, 2),
                 haber=0
@@ -310,6 +331,7 @@ def anular_pago(id_pago):
         # 5. Registrar Auditoría
         try:
             audit = PagoAudit(
+                id_empresa=id_empresa,
                 id_pago=pago.id_pago,
                 id_usuario=user_id,
                 accion='ANULACION',
@@ -331,5 +353,40 @@ def anular_pago(id_pago):
 @bp.get("/auditoria")
 @jwt_required()
 def get_auditoria_pagos():
-    query = PagoAudit.query.order_by(PagoAudit.id_audit.desc()).all()
-    return jsonify([a.to_dict() for a in query]), 200
+    try:
+        # Forzamos conversión a int por seguridad
+        id_empresa_raw = get_jwt().get("id_empresa")
+        id_empresa = int(id_empresa_raw) if id_empresa_raw else None
+        
+        if not id_empresa:
+            return jsonify({"message": "ID de empresa no encontrado en el token"}), 400
+
+        # Realizamos un Join para traer el nombre del cliente y del usuario
+        # Usamos outerjoin para el usuario también por si acaso hay huérfanos
+        results = db.session.query(
+            PagoAudit,
+            Usuario.nombre_usuario.label("usuario_nombre"),
+            Cliente.nombre.label("cliente_nombre"),
+            Cliente.apellido.label("cliente_apellido"),
+            Cliente.documento.label("cliente_ci")
+        ).outerjoin(Usuario, PagoAudit.id_usuario == Usuario.id_usuario)\
+         .outerjoin(DetalleCredito, PagoAudit.id_detalle_credito == DetalleCredito.id_detalle)\
+         .outerjoin(Credito, DetalleCredito.id_credito == Credito.id_credito)\
+         .outerjoin(Cliente, Credito.id_cliente == Cliente.id_cliente)\
+         .filter(PagoAudit.id_empresa == id_empresa)\
+         .order_by(PagoAudit.id_audit.desc())\
+         .limit(500)\
+         .all()
+
+        data = []
+        for audit, u_nome, c_nome, c_ape, c_ci in results:
+            d = audit.to_dict()
+            d["usuario_nombre"] = u_nome or "SISTEMA"
+            d["cliente_nombre"] = f"{c_nome} {c_ape}" if c_nome else "OTRO / AJUSTE"
+            d["cliente_ci"] = c_ci or "---"
+            data.append(d)
+
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"!!! CRASH EN AUDITORIA-PAGOS: {str(e)}") # Esto se verá en los logs del servidor
+        return jsonify({"message": "Error interno al cargar auditoría", "error": str(e)}), 500

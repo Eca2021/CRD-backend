@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.extensions import db
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
@@ -54,13 +54,16 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
     plan = []
     
     # Manejo de Fechas
-    if fecha_primer_pago:
+    if fecha_primer_pago and str(fecha_primer_pago).strip():
         if isinstance(fecha_primer_pago, str):
-            fecha_inicio = date.fromisoformat(fecha_primer_pago)
+            try:
+                fecha_inicio = date.fromisoformat(fecha_primer_pago)
+            except (ValueError, TypeError):
+                fecha_inicio = date.today() + timedelta(days=int(dias_intervalo or 7))
         else:
             fecha_inicio = fecha_primer_pago
     else:
-        fecha_inicio = date.today() + timedelta(days=7)
+        fecha_inicio = date.today() + timedelta(days=int(dias_intervalo or 7))
     
     acumulado_total = 0
     
@@ -123,146 +126,170 @@ def calculate_plan(monto, cuotas, tasa_porcentaje, dias_intervalo=7, fecha_prime
 def preview_credito():
     data = request.get_json() or {}
     try:
-        monto = float(data.get("monto") or 0)
-        cuotas = int(data.get("cuotas") or 0)
-        id_regla = data.get("id_regla")
-        fecha_primer_pago = data.get("fecha_primer_pago")
-        usar_redondeo = data.get("usar_redondeo", False)
-        monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
-    except (ValueError, TypeError):
-         return jsonify({"message": "Datos numéricos inválidos"}), 400
+        try:
+            monto = float(data.get("monto") or 0)
+            cuotas = int(data.get("cuotas") or 0)
+            # Asegurar que id_regla sea un entero para evitar error de tipos en PostgreSQL
+            id_regla_raw = data.get("id_regla")
+            id_regla = int(id_regla_raw) if id_regla_raw else None
+            
+            fecha_primer_pago = data.get("fecha_primer_pago")
+            usar_redondeo = data.get("usar_redondeo", False)
+            monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
+        except (ValueError, TypeError):
+             return jsonify({"message": "Datos numéricos inválidos"}), 400
 
-    regla = ReglaCredito.query.get(id_regla)
-    if not regla:
-        return jsonify({"message": "Regla no encontrada"}), 404
-        
-    if monto <= 0 or cuotas <= 0:
-        return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
-        
-    result = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
-    return jsonify(result), 200
+        id_empresa = get_jwt().get("id_empresa")
+        regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
+        if not regla:
+            return jsonify({"message": "Regla no encontrada o acceso denegado"}), 404
+            
+        if monto <= 0 or cuotas <= 0:
+            return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
+            
+        result = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
+        return jsonify(result), 200
+    except Exception as e:
+        # En caso de error inesperado, retornamos 500 con el mensaje
+        return jsonify({"message": "Error interno en cálculo", "error": str(e)}), 500
 
 @bp.post("/")
 @permission_required("credito.gestionar") # Assuming permission 'credito.gestionar' from user request
 def create_credito():
-    data = request.get_json() or {}
-    
-    # Validate inputs
+    import traceback
     try:
-        id_cliente = data.get("id_cliente")
-        id_regla = data.get("id_regla")
-        monto = float(data.get("monto") or 0)
-        cuotas = int(data.get("cuotas") or 0)
-        fecha_primer_pago = data.get("fecha_primer_pago")
-        usar_redondeo = data.get("usar_redondeo", False)
-        monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
-    except (ValueError, TypeError):
-        return jsonify({"message": "Datos inválidos"}), 400
-
-    if monto <= 0 or cuotas <= 0:
-        return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
+        data = request.get_json() or {}
         
-    cliente = Cliente.query.get(id_cliente)
-    if not cliente: return jsonify({"message": "Cliente no encontrado"}), 404
-    
-    regla = ReglaCredito.query.get(id_regla)
-    if not regla: return jsonify({"message": "Regla no encontrada"}), 404
-    
-    user_id = get_jwt_identity()
-    
-    # Calculate
-    calc = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
-    
-    # Create Entities
-    nuevo_credito = Credito(
-        id_cliente=id_cliente,
-        id_usuario=user_id,
-        id_regla=id_regla,
-        monto_solicitado=monto,
-        monto_total_a_pagar=calc["monto_total"],
-        cantidad_cuotas=cuotas,
-        fecha_desembolso=date.today(),
-        estado='PENDIENTE'
-    )
-    
-    db.session.add(nuevo_credito)
-    db.session.flush() # Get ID
-    
-    # Create Details
-    for p in calc["plan"]:
-        det = DetalleCredito(
-            id_credito=nuevo_credito.id_credito,
-            numero_cuota=p["numero_cuota"],
-            monto_cuota=p["monto_cuota"],
-            fecha_vencimiento=date.fromisoformat(p["fecha_vencimiento"]),
-            monto_pagado=0,
-            estado_cuota='PENDIENTE',
-            capital_cuota=p["capital_cuota"],
-            interes_cuota=p["interes_cuota"],
-            cuota_total=p["cuota_total"]
-        )
-        db.session.add(det)
-        
-    # ---------------------------------------------------------
-    # Asiento Contable de Apertura
-    # ---------------------------------------------------------
-    try:
-        # 1. Crear Asiento
-        asiento = AsientoContable(
-            glosa=f"Desembolso Crédito #{nuevo_credito.id_credito} - {cliente.nombre} {cliente.apellido}",
-            id_usuario=user_id,
-            fecha=datetime.now()
-        )
-        db.session.add(asiento)
-        db.session.flush()
-
-        # 2. Movimientos
-        
-        # A) DEBE: Cuentas por Cobrar (Total Deuda = Capital + Interés)
-        mov_cxc = MovimientoContable(
-            id_asiento=asiento.id_asiento,
-            cuenta='Cuentas por Cobrar',
-            debe=calc["monto_total"],
-            haber=0
-        )
-        db.session.add(mov_cxc)
-        
-        # B) HABER: Caja (Dinero entregado = Capital)
-        mov_caja = MovimientoContable(
-            id_asiento=asiento.id_asiento,
-            cuenta='Caja',
-            debe=0,
-            haber=monto
-        )
-        db.session.add(mov_caja)
-        
-        # C) HABER: Intereses por Cobrar (Ganancia Futura)
-        if calc["interes_total"] > 0:
-            mov_int = MovimientoContable(
-                id_asiento=asiento.id_asiento,
-                cuenta='Intereses por Cobrar',
-                debe=0,
-                haber=calc["interes_total"]
-            )
-            db.session.add(mov_int)
+        # Validate inputs
+        try:
+            id_cliente_raw = data.get("id_cliente")
+            id_cliente = int(id_cliente_raw) if id_cliente_raw else None
             
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"message": "Error generando contabilidad inicial", "error": str(e)}), 500
+            id_regla_raw = data.get("id_regla")
+            id_regla = int(id_regla_raw) if id_regla_raw else None
+            
+            monto = float(data.get("monto") or 0)
+            cuotas = int(data.get("cuotas") or 0)
+            fecha_primer_pago = data.get("fecha_primer_pago")
+            usar_redondeo = data.get("usar_redondeo", False)
+            monto_redondeado = float(data.get("monto_cuota_redondeado") or 0)
+        except (ValueError, TypeError):
+            return jsonify({"message": "Datos inválidos"}), 400
 
-    try:
+        if monto <= 0 or cuotas <= 0:
+            return jsonify({"message": "Monto y cuotas deben ser mayores a 0"}), 400
+            
+        id_empresa = get_jwt().get("id_empresa")
+        
+        cliente = Cliente.query.filter_by(id_cliente=id_cliente, id_empresa=id_empresa).first()
+        if not cliente: return jsonify({"message": "Cliente no encontrado o acceso denegado"}), 404
+        
+        regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
+        if not regla: return jsonify({"message": "Regla no encontrada o acceso denegado"}), 404
+        
+        user_id = get_jwt_identity()
+        
+        # Calculate
+        calc = calculate_plan(monto, cuotas, regla.porcentaje, regla.dias_intervalo, fecha_primer_pago, usar_redondeo, monto_redondeado)
+        
+        # Create Entities
+        nuevo_credito = Credito(
+            id_empresa=id_empresa,
+            id_cliente=id_cliente,
+            id_usuario=user_id,
+            id_regla=id_regla,
+            monto_solicitado=monto,
+            monto_total_a_pagar=calc["monto_total"],
+            cantidad_cuotas=cuotas,
+            fecha_desembolso=date.today(),
+            estado='PENDIENTE'
+        )
+        
+        db.session.add(nuevo_credito)
+        db.session.flush() # Get ID
+        
+        # Create Details
+        for p in calc["plan"]:
+            det = DetalleCredito(
+                id_credito=nuevo_credito.id_credito,
+                numero_cuota=p["numero_cuota"],
+                monto_cuota=p["monto_cuota"],
+                fecha_vencimiento=date.fromisoformat(p["fecha_vencimiento"]),
+                monto_pagado=0,
+                estado_cuota='PENDIENTE',
+                capital_cuota=p["capital_cuota"],
+                interes_cuota=p["interes_cuota"],
+                cuota_total=p["cuota_total"]
+            )
+            db.session.add(det)
+            
+        # ---------------------------------------------------------
+        # Asiento Contable de Apertura
+        # ---------------------------------------------------------
+        try:
+            # 1. Crear Asiento
+            asiento = AsientoContable(
+                id_empresa=id_empresa,
+                glosa=f"Desembolso Crédito #{nuevo_credito.id_credito} - {cliente.nombre} {cliente.apellido}",
+                id_usuario=user_id,
+                fecha=datetime.now()
+            )
+            db.session.add(asiento)
+            db.session.flush()
+
+            # 2. Movimientos
+            
+            # A) DEBE: Cuentas por Cobrar (Total Deuda = Capital + Interés)
+            mov_cxc = MovimientoContable(
+                id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
+                cuenta='Cuentas por Cobrar',
+                debe=calc["monto_total"],
+                haber=0
+            )
+            db.session.add(mov_cxc)
+            
+            # B) HABER: Caja (Dinero entregado = Capital)
+            mov_caja = MovimientoContable(
+                id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
+                cuenta='Caja',
+                debe=0,
+                haber=monto
+            )
+            db.session.add(mov_caja)
+            
+            # C) HABER: Intereses por Cobrar (Ganancia Futura)
+            if calc["interes_total"] > 0:
+                mov_int = MovimientoContable(
+                    id_asiento=asiento.id_asiento,
+                    id_empresa=id_empresa,
+                    cuenta='Intereses por Cobrar',
+                    debe=0,
+                    haber=calc["interes_total"]
+                )
+                db.session.add(mov_int)
+                
+        except Exception as e_cont:
+            print(f"Error al generar asiento contable: {e_cont}")
+
         db.session.commit()
         return jsonify({"message": "Crédito creado exitosamente", "credito": nuevo_credito.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
+        with open("error_diag.log", "a") as f:
+            f.write(f"\n--- ERROR CREATE {datetime.now()} ---\n")
+            f.write(traceback.format_exc())
+            f.write("-------------------------------------\n")
         return jsonify({"message": "Error creando crédito", "error": str(e)}), 500
 
 @bp.post("/<int:id_credito>/anular")
 @permission_required("credito.gestionar")
 def anular_credito(id_credito):
-    credito = Credito.query.get(id_credito)
+    id_empresa = get_jwt().get("id_empresa")
+    credito = Credito.query.filter_by(id_credito=id_credito, id_empresa=id_empresa).first()
     if not credito:
-        return jsonify({"message": "Crédito no encontrado"}), 404
+        return jsonify({"message": "Crédito no encontrado o acceso denegado"}), 404
 
     if credito.estado == 'ANULADO':
         return jsonify({"message": "El crédito ya está anulado"}), 400
@@ -298,6 +325,7 @@ def anular_credito(id_credito):
         original_interes = original_total - original_monto
 
         asiento = AsientoContable(
+            id_empresa=id_empresa,
             glosa=f"ANULACIÓN Crédito #{credito.id_credito}",
             id_usuario=user_id,
             fecha=datetime.now()
@@ -308,6 +336,7 @@ def anular_credito(id_credito):
         # A) DEBE: Caja (Devolución del Capital)
         mov_caja = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Caja',
             debe=original_monto,
             haber=0
@@ -318,6 +347,7 @@ def anular_credito(id_credito):
         if original_interes > 0:
             mov_int = MovimientoContable(
                 id_asiento=asiento.id_asiento,
+                id_empresa=id_empresa,
                 cuenta='Intereses por Cobrar',
                 debe=original_interes,
                 haber=0
@@ -327,6 +357,7 @@ def anular_credito(id_credito):
         # C) HABER: Cuentas por Cobrar (Cancelación de Deuda)
         mov_cxc = MovimientoContable(
             id_asiento=asiento.id_asiento,
+            id_empresa=id_empresa,
             cuenta='Cuentas por Cobrar',
             debe=0,
             haber=original_total
@@ -343,19 +374,42 @@ def anular_credito(id_credito):
 @bp.get("/")
 @permission_required("credito.gestionar")
 def get_creditos():
-    creditos = Credito.query.order_by(Credito.id_credito.desc()).all()
+    id_empresa = get_jwt().get("id_empresa")
+    # Filtramos para no mostrar créditos ANULADOS en la operativa diaria
+    creditos = Credito.query.filter(
+        Credito.id_empresa == id_empresa,
+        Credito.estado != 'ANULADO'
+    ).order_by(Credito.id_credito.desc()).all()
     return jsonify([c.to_dict() for c in creditos]), 200
 
 @bp.get("/cliente/<int:id_cliente>")
 @permission_required("credito.gestionar")
 def get_creditos_by_cliente(id_cliente):
-    creditos = Credito.query.filter_by(id_cliente=id_cliente).order_by(Credito.id_credito.desc()).all()
+    id_empresa = get_jwt().get("id_empresa")
+    # Filtramos para no mostrar créditos ANULADOS en la operativa diaria del cliente
+    creditos = Credito.query.filter(
+        Credito.id_cliente == id_cliente,
+        Credito.id_empresa == id_empresa,
+        Credito.estado != 'ANULADO'
+    ).order_by(Credito.id_credito.desc()).all()
+    return jsonify([c.to_dict() for c in creditos]), 200
+
+@bp.get("/anulados")
+@permission_required("credito.gestionar")
+def get_creditos_anulados():
+    id_empresa = get_jwt().get("id_empresa")
+    # Filtramos exclusivamente créditos ANULADOS para auditoría
+    creditos = Credito.query.filter(
+        Credito.id_empresa == id_empresa,
+        Credito.estado == 'ANULADO'
+    ).order_by(Credito.id_credito.desc()).all()
     return jsonify([c.to_dict() for c in creditos]), 200
 
 @bp.get("/<int:id_credito>")
 @permission_required("credito.gestionar")
 def get_credito_by_id(id_credito):
-    credito = Credito.query.get(id_credito)
+    id_empresa = get_jwt().get("id_empresa")
+    credito = Credito.query.filter_by(id_credito=id_credito, id_empresa=id_empresa).first()
     if not credito:
-        return jsonify({"message": "Crédito no encontrado"}), 404
+        return jsonify({"message": "Crédito no encontrado o acceso denegado"}), 404
     return jsonify(credito.to_dict()), 200

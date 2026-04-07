@@ -37,15 +37,21 @@ def roles_required(roles):
 @bp.post("/login")
 def login():
     data = request.get_json() or {}
-    username = data.get("username")
-    password = data.get("password")
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    
+    print(f"🕵️ Intento de login - User: [{username}] | PassLen: {len(password)}")
+    
     from werkzeug.security import check_password_hash
-
-    user = Usuario.query.filter_by(nombre_usuario=username).first()
+    from sqlalchemy import func
+    
+    # Búsqueda insensible a mayúsculas y espacios
+    user = Usuario.query.filter(func.lower(Usuario.nombre_usuario) == username.lower()).first()
     ip_cliente = request.remote_addr
     user_agent = request.headers.get('User-Agent')
 
     if not user:
+        print(f"❌ Login FALLIDO: Usuario '{username}' no existe en la DB.")
         new_log = HistorialAcceso(
             username_intentado=username,
             evento='LOGIN_FALLIDO',
@@ -58,8 +64,10 @@ def login():
         return jsonify({"msg": "Credenciales inválidas"}), 401
 
     if not check_password_hash(user.password_hash, password):
+        print(f"❌ Login FALLIDO: Contraseña incorrecta para el usuario '{username}'.")
         new_log = HistorialAcceso(
             id_usuario=user.id_usuario,
+            id_empresa=user.id_empresa,
             username_intentado=username,
             evento='LOGIN_FALLIDO',
             ip_cliente=ip_cliente,
@@ -73,6 +81,7 @@ def login():
     if user.estado != 'ACTIVO':
         new_log = HistorialAcceso(
             id_usuario=user.id_usuario,
+            id_empresa=user.id_empresa,
             username_intentado=username,
             evento='LOGIN_FALLIDO',
             ip_cliente=ip_cliente,
@@ -97,6 +106,7 @@ def login():
     # Registro de login exitoso
     new_log = HistorialAcceso(
         id_usuario=user.id_usuario,
+        id_empresa=user.id_empresa,
         username_intentado=username,
         evento='LOGIN_EXITOSO',
         ip_cliente=ip_cliente,
@@ -112,6 +122,8 @@ def login():
         "user_roles": [r.rol.nombre for r in user.roles],
         "user_permissions": permisos,
         "user_id": str(user.id_usuario),
+        "id_empresa": user.id_empresa,
+        "empresa_nombre": user.empresa.nombre if user.empresa else None
     })
 
 @bp.post("/logout")
@@ -145,7 +157,8 @@ def register_jwt_callbacks(jwt_manager):
     def add_claims_to_access_token(identity):
         user = Usuario.query.filter_by(id_usuario=int(identity)).first()
         roles = [ur.rol.nombre for ur in user.roles] if user else []
-        return {"roles": roles}
+        id_empresa = user.id_empresa if user else None
+        return {"roles": roles, "id_empresa": id_empresa}
 
     @jwt_manager.user_lookup_loader
     def user_lookup_callback(jwt_header, jwt_data):

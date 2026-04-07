@@ -21,6 +21,12 @@ def roles_required(required_roles):
         def decorated(*args, **kwargs):
             claims = get_jwt() or {}
             roles = [r.upper() for r in (claims.get("roles", []) or [])]
+            
+            # SuperAdmin bypass: siempre tiene acceso si es GLOBAL
+            id_empresa = claims.get("id_empresa")
+            if "SUPERADMIN" in roles and id_empresa is None:
+                return fn(*args, **kwargs)
+                
             required_upper = [r.upper() for r in required_roles]
             if any(r in roles for r in required_upper):
                 return fn(*args, **kwargs)
@@ -63,6 +69,27 @@ def create_user():
     estado = (data.get("estado") or "ACTIVO").strip()
     roles_ids = data.get("roles", []) or []
 
+    # Manejo de multi-tenant:
+    # Por defecto, el usuario se crea en la empresa del administrador que lo crea.
+    # Si es un SuperAdmin, puede elegir la empresa en el payload (data.get('id_empresa')).
+    claims = get_jwt()
+    current_user_roles = [r.upper() for r in (claims.get("roles", []) or [])]
+    is_super = "SUPERADMIN" in current_user_roles and claims.get("id_empresa") is None
+    
+    # --- Manejo de Multi-Tenant y Seguridad ---
+    id_empresa_target = claims.get("id_empresa")
+    if is_super and data.get("id_empresa"):
+        id_empresa_target = data.get("id_empresa")
+    elif not is_super:
+        # Los administradores locales solo pueden crear usuarios en su propia empresa
+        id_empresa_target = claims.get("id_empresa")
+
+    # [SEGURIDAD] Bloquear asignación de SuperAdmin por no-superadmins
+    if not is_super and roles_ids:
+        super_admin_role = Rol.query.filter(func.lower(Rol.nombre) == 'superadmin').first()
+        if super_admin_role and super_admin_role.id_rol in roles_ids:
+            return jsonify({"message": "No tienes permiso para asignar el rol SuperAdmin"}), 403
+
     if not nombre_usuario or not password:
         return jsonify({"message": "Nombre de usuario y contraseña son requeridos"}), 400
 
@@ -86,6 +113,7 @@ def create_user():
 
     try:
         nuevo = Usuario(
+            id_empresa=id_empresa_target,
             nombre_usuario=nombre_usuario,
             nombre=nombre,
             email=email,
@@ -111,10 +139,30 @@ def create_user():
 @roles_required(["Admin"])
 def get_users():
     q       = (request.args.get("q") or "").strip()
+    id_empresa_filter = request.args.get("id_empresa")
     estado  = (request.args.get("estado") or "").strip().upper()
     deleted = (request.args.get("deleted") or "").strip().lower()
 
+    id_empresa = get_jwt().get("id_empresa")
+    claims = get_jwt()
+    current_roles = [r.upper() for r in (claims.get("roles", []) or [])]
+    is_super = "SUPERADMIN" in current_roles and claims.get("id_empresa") is None
+
+    # Base query: filtrar por empresa si no es super
     qry = Usuario.query
+    if not is_super:
+        qry = qry.filter_by(id_empresa=id_empresa)
+        # ADEMÁS: Excluir usuarios que tengan el rol 'SuperAdmin'
+        # para que los Admins de empresa no los vean.
+        subq = db.session.query(UsuarioRol.id_usuario).join(Rol).filter(func.lower(Rol.nombre) == 'superadmin').subquery()
+        qry = qry.filter(Usuario.id_usuario.not_in(subq))
+    else:
+        # SuperAdmin: si pasó id_empresa en query, filtramos
+        if id_empresa_filter and id_empresa_filter not in ('null', 'undefined', ''):
+            try:
+                qry = qry.filter_by(id_empresa=int(id_empresa_filter))
+            except (ValueError, TypeError):
+                pass # Si no es un número válido, no filtramos por id_empresa
 
     # /api/usuarios/?deleted=true  → solo eliminados
     if deleted in ("1", "true", "t", "si", "sí", "yes", "y"):
@@ -148,9 +196,19 @@ def get_deleted_users():
 @bp.put("/<int:id_usuario>")
 @roles_required(["Admin"])
 def update_user(id_usuario):
-    user = Usuario.query.get(id_usuario)
+    claims = get_jwt()
+    id_empresa_caller = claims.get("id_empresa")
+    is_super_caller = "SUPERADMIN" in [r.upper() for r in (claims.get("roles", []) or [])] and id_empresa_caller is None
+
+    # Si es SuperAdmin Global, puede buscar a cualquier usuario. 
+    # Si es Admin local, solo en su propia empresa.
+    if is_super_caller:
+        user = Usuario.query.get(id_usuario)
+    else:
+        user = Usuario.query.filter_by(id_usuario=id_usuario, id_empresa=id_empresa_caller).first()
+
     if not user:
-        return jsonify({"message": "Usuario no encontrado"}), 404
+        return jsonify({"message": "Usuario no encontrado o acceso denegado"}), 404
 
     data = request.get_json() or {}
 
@@ -186,6 +244,15 @@ def update_user(id_usuario):
         faltantes = [rid for rid in roles_to_add if rid not in existentes]
         if faltantes:
             return jsonify({"message": f"El/los rol(es) {faltantes} no existen para añadir."}), 400
+            
+        # [SEGURIDAD] Bloquear asignación de SuperAdmin por no-superadmins
+        claims = get_jwt()
+        current_user_roles = [r.upper() for r in (claims.get("roles", []) or [])]
+        is_super = "SUPERADMIN" in current_user_roles and claims.get("id_empresa") is None
+        if not is_super:
+            super_admin_role = Rol.query.filter(func.lower(Rol.nombre) == 'superadmin').first()
+            if super_admin_role and super_admin_role.id_rol in roles_to_add:
+                return jsonify({"message": "No tienes permiso para otorgar el rol SuperAdmin"}), 403
 
     try:
         if roles_to_remove:
@@ -208,7 +275,8 @@ def update_user(id_usuario):
 @bp.delete("/<int:id_usuario>")
 @roles_required(["Admin"])
 def delete_user(id_usuario):
-    user = Usuario.query.get(id_usuario)
+    id_empresa = get_jwt().get("id_empresa")
+    user = Usuario.query.filter_by(id_usuario=id_usuario, id_empresa=id_empresa).first()
     if not user:
         return jsonify({"message": "Usuario no encontrado"}), 404
 

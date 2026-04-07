@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.extensions import db
 from app.models.catalog import AsientoContable, MovimientoContable, Usuario
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from datetime import datetime, timedelta
 from sqlalchemy import func, case
 
@@ -13,21 +13,22 @@ def get_dashboard_data():
     """
     Retorna los saldos actuales de las cuentas principales y datos para el gráfico de flujo de caja.
     """
+    id_empresa = get_jwt().get("id_empresa")
     try:
         # 1. Saldo CAJA (Debe - Haber)
         saldo_caja = db.session.query(
             func.coalesce(func.sum(MovimientoContable.debe - MovimientoContable.haber), 0)
-        ).filter(MovimientoContable.cuenta == 'Caja').scalar()
+        ).filter(MovimientoContable.cuenta == 'Caja', MovimientoContable.id_empresa == id_empresa).scalar()
 
         # 2. Saldo CUENTAS POR COBRAR (Debe - Haber)
         saldo_cxc = db.session.query(
             func.coalesce(func.sum(MovimientoContable.debe - MovimientoContable.haber), 0)
-        ).filter(MovimientoContable.cuenta == 'Cuentas por Cobrar').scalar()
+        ).filter(MovimientoContable.cuenta == 'Cuentas por Cobrar', MovimientoContable.id_empresa == id_empresa).scalar()
 
         # 3. Saldo GANANCIAS POR INTERESES (Haber - Debe) [Ganancia es Acreedora]
         saldo_ganancias = db.session.query(
             func.coalesce(func.sum(MovimientoContable.haber - MovimientoContable.debe), 0)
-        ).filter(MovimientoContable.cuenta == 'Ganancias por Intereses').scalar()
+        ).filter(MovimientoContable.cuenta == 'Ganancias por Intereses', MovimientoContable.id_empresa == id_empresa).scalar()
 
         # 4. Datos para Gráfico (Últimos 7 días) - Flujo de CAJA
         today = datetime.now().date()
@@ -41,6 +42,7 @@ def get_dashboard_data():
         ).join(AsientoContable)\
          .filter(MovimientoContable.cuenta == 'Caja')\
          .filter(AsientoContable.fecha >= start_date)\
+         .filter(AsientoContable.id_empresa == id_empresa)\
          .group_by(func.date(AsientoContable.fecha))\
          .order_by(func.date(AsientoContable.fecha)).all()
 
@@ -72,20 +74,37 @@ def get_asientos():
     fecha_inicio = request.args.get('fecha_inicio')
     fecha_fin = request.args.get('fecha_fin')
     glosa = request.args.get('glosa')
+    
+    # Paginación
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+    except ValueError:
+        page = 1
+        per_page = 10
 
-    query = AsientoContable.query.order_by(AsientoContable.fecha.desc())
+    id_empresa = get_jwt().get("id_empresa")
+    query = AsientoContable.query.filter_by(id_empresa=id_empresa).order_by(AsientoContable.fecha.desc())
 
     if fecha_inicio:
         query = query.filter(AsientoContable.fecha >= fecha_inicio)
     if fecha_fin:
-        # Ajustar fin del día para fecha_fin
         query = query.filter(AsientoContable.fecha <= f"{fecha_fin} 23:59:59")
     if glosa:
         query = query.filter(AsientoContable.glosa.ilike(f"%{glosa}%"))
 
-    asientos = query.limit(100).all() # Limitar a los últimos 100 por defecto para rendimiento
+    # Cálculos de página
+    total = query.count()
+    pages = (total + per_page - 1) // per_page
+    asientos = query.limit(per_page).offset((page - 1) * per_page).all()
 
-    return jsonify([a.to_dict() for a in asientos]), 200
+    return jsonify({
+        "items": [a.to_dict() for a in asientos],
+        "total": total,
+        "pages": pages,
+        "page": page,
+        "per_page": per_page
+    }), 200
 
 @bp.post("/asientos")
 @jwt_required()
@@ -107,7 +126,9 @@ def create_asiento_manual():
         user_id = get_jwt_identity()
         monto = float(monto)
 
+        id_empresa = get_jwt().get("id_empresa")
         asiento = AsientoContable(
+            id_empresa=id_empresa,
             glosa=glosa,
             id_usuario=user_id,
             fecha=datetime.now()
@@ -118,14 +139,14 @@ def create_asiento_manual():
         if tipo == 'INGRESO':
             # Caja: Debe (Entra plata)
             # Otra Cuenta: Haber (Contrapartida)
-            mov_caja = MovimientoContable(id_asiento=asiento.id_asiento, cuenta='Caja', debe=monto, haber=0)
-            mov_contra = MovimientoContable(id_asiento=asiento.id_asiento, cuenta=otra_cuenta, debe=0, haber=monto)
+            mov_caja = MovimientoContable(id_asiento=asiento.id_asiento, id_empresa=id_empresa, cuenta='Caja', debe=monto, haber=0)
+            mov_contra = MovimientoContable(id_asiento=asiento.id_asiento, id_empresa=id_empresa, cuenta=otra_cuenta, debe=0, haber=monto)
         
         elif tipo == 'EGRESO':
             # Caja: Haber (Sale plata)
             # Otra Cuenta: Debe (Gasto/Activo)
-            mov_contra = MovimientoContable(id_asiento=asiento.id_asiento, cuenta=otra_cuenta, debe=monto, haber=0)
-            mov_caja = MovimientoContable(id_asiento=asiento.id_asiento, cuenta='Caja', debe=0, haber=monto)
+            mov_contra = MovimientoContable(id_asiento=asiento.id_asiento, id_empresa=id_empresa, cuenta=otra_cuenta, debe=monto, haber=0)
+            mov_caja = MovimientoContable(id_asiento=asiento.id_asiento, id_empresa=id_empresa, cuenta='Caja', debe=0, haber=monto)
         
         else:
             return jsonify({"message": "Tipo debe ser INGRESO o EGRESO"}), 400
@@ -158,7 +179,9 @@ def apertura_capital():
         user_id = get_jwt_identity()
         monto = float(monto)
 
+        id_empresa = get_jwt().get("id_empresa")
         asiento = AsientoContable(
+            id_empresa=id_empresa,
             glosa="Apertura de Capital",
             id_usuario=user_id,
             fecha=datetime.now()
@@ -169,6 +192,7 @@ def apertura_capital():
         # Movimiento 1: Ingreso a Caja
         mov_caja = MovimientoContable(
             id_asiento=asiento.id_asiento, 
+            id_empresa=id_empresa,
             cuenta='Caja', 
             debe=monto, 
             haber=0
@@ -177,6 +201,7 @@ def apertura_capital():
         # Movimiento 2: Capital Propio (Contrapartida)
         mov_capital = MovimientoContable(
             id_asiento=asiento.id_asiento, 
+            id_empresa=id_empresa,
             cuenta='Capital Propio', 
             debe=0, 
             haber=monto
@@ -191,3 +216,49 @@ def apertura_capital():
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "Error en apertura de capital", "error": str(e)}), 500
+
+@bp.get("/cuentas")
+@jwt_required()
+def get_cuentas():
+    """
+    Retorna la lista de nombres únicos de cuentas usadas por la empresa.
+    Base para el sistema 'antibobo' en el frontend.
+    """
+    id_empresa = get_jwt().get("id_empresa")
+    try:
+        cuentas_query = db.session.query(
+            MovimientoContable.cuenta
+        ).filter(MovimientoContable.id_empresa == id_empresa)\
+         .distinct().order_by(MovimientoContable.cuenta).all()
+        
+        nombres = [c[0] for c in cuentas_query if c[0]]
+        
+        # Si no hay cuentas aún, enviamos las básicas por defecto
+        if not nombres:
+            nombres = ["Caja", "Cuentas por Cobrar", "Ganancias por Intereses", "Intereses por Cobrar", "Capital Propio"]
+            
+        return jsonify(nombres), 200
+    except Exception as e:
+        return jsonify({"message": "Error cargando catálogo", "error": str(e)}), 500
+
+@bp.get("/glosas")
+@jwt_required()
+def get_glosas():
+    """
+    Retorna la lista de glosas (descripciones) únicas usadas en los asientos de la empresa.
+    """
+    id_empresa = get_jwt().get("id_empresa")
+    try:
+        glosas_query = db.session.query(
+            AsientoContable.glosa
+        ).filter(AsientoContable.id_empresa == id_empresa)\
+         .distinct().order_by(AsientoContable.glosa).all()
+        
+        glosas = [g[0] for g in glosas_query if g[0]]
+        
+        if not glosas:
+            glosas = ["Apertura de caja", "Inyección de Capital", "Gasto operativo", "Pago de servicios"]
+            
+        return jsonify(glosas), 200
+    except Exception as e:
+        return jsonify({"message": "Error cargando histórico de glosas", "error": str(e)}), 500

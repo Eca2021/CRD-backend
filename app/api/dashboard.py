@@ -1,6 +1,6 @@
 # app/api/dashboard.py
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, case, extract, text
 
@@ -14,6 +14,7 @@ bp = Blueprint("dashboard", __name__)
 @bp.get("/summary")
 @jwt_required()
 def get_dashboard_summary():
+    id_empresa = get_jwt().get("id_empresa")
     try:
         today = date.today()
         
@@ -21,12 +22,12 @@ def get_dashboard_summary():
         # Capital Inyectado Admin: Movimientos manuales legacy
         capital_admin = db.session.query(
             func.coalesce(func.sum(MovimientoAdmin.monto), 0)
-        ).filter(MovimientoAdmin.tipo == 'INYECCION').scalar()
+        ).filter(MovimientoAdmin.tipo == 'INYECCION', MovimientoAdmin.id_empresa == id_empresa).scalar()
 
         # Capital Contable: Aportes registrados por el Módulo Contable (Haber - Debe para cuenta Capital)
         capital_contable = db.session.query(
             func.coalesce(func.sum(MovimientoContable.haber - MovimientoContable.debe), 0)
-        ).filter(MovimientoContable.cuenta == 'Capital Propio').scalar()
+        ).filter(MovimientoContable.cuenta == 'Capital Propio', MovimientoContable.id_empresa == id_empresa).scalar()
 
         # Capital Inyectado Total
         capital_inyectado = float(capital_admin) + float(capital_contable)
@@ -34,17 +35,17 @@ def get_dashboard_summary():
         # Capital Recuperado: Suma de capital_cuota de cuotas PAGADAS
         capital_recuperado = db.session.query(
             func.coalesce(func.sum(DetalleCredito.capital_cuota), 0)
-        ).filter(DetalleCredito.estado_cuota == 'PAGADO').scalar()
+        ).join(Credito).filter(DetalleCredito.estado_cuota == 'PAGADO', Credito.id_empresa == id_empresa).scalar()
 
         # Capital Prestado: Suma de monto_solicitado de créditos (NO ANULADOS)
         capital_prestado = db.session.query(
             func.coalesce(func.sum(Credito.monto_solicitado), 0)
-        ).filter(Credito.estado != 'ANULADO').scalar()
+        ).filter(Credito.estado != 'ANULADO', Credito.id_empresa == id_empresa).scalar()
 
         # Retiros de Socios: Retiros registrados en movimientos_admin
         retiros_socios = db.session.query(
             func.coalesce(func.sum(MovimientoAdmin.monto), 0)
-        ).filter(MovimientoAdmin.tipo == 'RETIRO').scalar()
+        ).filter(MovimientoAdmin.tipo == 'RETIRO', MovimientoAdmin.id_empresa == id_empresa).scalar()
 
         capital_disponible = float(capital_inyectado) + float(capital_recuperado) - float(capital_prestado) - float(retiros_socios)
 
@@ -52,14 +53,14 @@ def get_dashboard_summary():
         # Cobros totales: Todo lo pagado (capital + interes)
         cobros_totales = db.session.query(
             func.coalesce(func.sum(Pago.monto_pagado), 0)
-        ).filter(Pago.estado == 'ACTIVO').scalar()
+        ).filter(Pago.estado == 'ACTIVO', Pago.id_empresa == id_empresa).scalar()
 
         # Préstamos entregados (ya lo tenemos como capital_prestado)
         
         # Retiros/Gastos: Aquí incluimos egresos de movimientos_contables (cuenta Caja, haber) + retiros socios
         gastos_contables = db.session.query(
             func.coalesce(func.sum(MovimientoContable.haber), 0)
-        ).filter(MovimientoContable.cuenta == 'Caja').scalar()
+        ).filter(MovimientoContable.cuenta == 'Caja', MovimientoContable.id_empresa == id_empresa).scalar()
         
         # Nota: La lógica contable podría ser más precisa si usamos el saldo de Caja directamente,
         # pero seguiré la fórmula del usuario: Cobros - Préstamos - Retiros/Gastos.
@@ -69,24 +70,24 @@ def get_dashboard_summary():
         # Si prefieres el saldo real contable para mayor precisión:
         saldo_caja_real = db.session.query(
             func.coalesce(func.sum(MovimientoContable.debe - MovimientoContable.haber), 0)
-        ).filter(MovimientoContable.cuenta == 'Caja').scalar()
+        ).filter(MovimientoContable.cuenta == 'Caja', MovimientoContable.id_empresa == id_empresa).scalar()
         # El usuario pidió una fórmula específica, pero el saldo contable suele ser lo más fiable.
         # Usaré el saldo contable como "Caja Total Actual" ya que refleja todo lo que entró y salió.
 
         # 3. Por Cobrar (Solo Capital): Suma de capital_cuota donde estado es 'PENDIENTE' o 'VENCIDO'
         por_cobrar_capital = db.session.query(
             func.coalesce(func.sum(DetalleCredito.capital_cuota), 0)
-        ).filter(DetalleCredito.estado_cuota.in_(['PENDIENTE', 'VENCIDO'])).scalar()
+        ).join(Credito).filter(DetalleCredito.estado_cuota.in_(['PENDIENTE', 'VENCIDO']), Credito.id_empresa == id_empresa).scalar()
 
         # 4. Ganancia Pendiente (Solo Interés): Suma de interes_cuota donde estado es 'PENDIENTE' o 'VENCIDO'
         ganancia_pendiente = db.session.query(
             func.coalesce(func.sum(DetalleCredito.interes_cuota), 0)
-        ).filter(DetalleCredito.estado_cuota.in_(['PENDIENTE', 'VENCIDO'])).scalar()
+        ).join(Credito).filter(DetalleCredito.estado_cuota.in_(['PENDIENTE', 'VENCIDO']), Credito.id_empresa == id_empresa).scalar()
 
         # 5. Ganancia Realizada (Intereses Cobrados): Suma de interes_cuota de cuotas PAGADAS
         ganancia_realizada = db.session.query(
             func.coalesce(func.sum(DetalleCredito.interes_cuota), 0)
-        ).filter(DetalleCredito.estado_cuota == 'PAGADO').scalar()
+        ).join(Credito).filter(DetalleCredito.estado_cuota == 'PAGADO', Credito.id_empresa == id_empresa).scalar()
 
         # Chart Data (Diferente a lo solicitado pero útil de mantener del original)
         start_date = today - timedelta(days=30)
@@ -97,6 +98,7 @@ def get_dashboard_summary():
         ).join(AsientoContable)\
          .filter(MovimientoContable.cuenta == 'Caja')\
          .filter(AsientoContable.fecha >= start_date)\
+         .filter(AsientoContable.id_empresa == id_empresa)\
          .group_by(func.date(AsientoContable.fecha))\
          .order_by(func.date(AsientoContable.fecha)).all()
 

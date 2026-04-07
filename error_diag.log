@@ -1,0 +1,296 @@
+
+--- ERROR PREVIEW 2026-04-06 15:32:34.230980 ---
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedFunction: el operador no existe: integer = character varying
+LINE 3: WHERE reglas_credito.id_regla = $1::VARCHAR AND reglas_credi...
+                                      ^
+HINT:  Ningún operador coincide en el nombre y tipos de argumentos. Puede ser necesario agregar conversión explícita de tipos.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\app\api\creditos.py", line 141, in preview_credito
+    regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.ProgrammingError: (psycopg.errors.UndefinedFunction) el operador no existe: integer = character varying
+LINE 3: WHERE reglas_credito.id_regla = $1::VARCHAR AND reglas_credi...
+                                      ^
+HINT:  Ningún operador coincide en el nombre y tipos de argumentos. Puede ser necesario agregar conversión explícita de tipos.
+[SQL: SELECT reglas_credito.id_regla AS reglas_credito_id_regla, reglas_credito.id_empresa AS reglas_credito_id_empresa, reglas_credito.codigo AS reglas_credito_codigo, reglas_credito.nombre AS reglas_credito_nombre, reglas_credito.porcentaje AS reglas_credito_porcentaje, reglas_credito.dias_intervalo AS reglas_credito_dias_intervalo, reglas_credito.activo AS reglas_credito_activo 
+FROM reglas_credito 
+WHERE reglas_credito.id_regla = %(id_regla_1)s::VARCHAR AND reglas_credito.id_empresa = %(id_empresa_1)s::INTEGER 
+ LIMIT %(param_1)s::INTEGER]
+[parameters: {'id_regla_1': '1', 'id_empresa_1': 1, 'param_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+-------------------------------------
+
+--- ERROR PREVIEW 2026-04-06 15:32:38.467032 ---
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedFunction: el operador no existe: integer = character varying
+LINE 3: WHERE reglas_credito.id_regla = $1::VARCHAR AND reglas_credi...
+                                      ^
+HINT:  Ningún operador coincide en el nombre y tipos de argumentos. Puede ser necesario agregar conversión explícita de tipos.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\app\api\creditos.py", line 141, in preview_credito
+    regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.ProgrammingError: (psycopg.errors.UndefinedFunction) el operador no existe: integer = character varying
+LINE 3: WHERE reglas_credito.id_regla = $1::VARCHAR AND reglas_credi...
+                                      ^
+HINT:  Ningún operador coincide en el nombre y tipos de argumentos. Puede ser necesario agregar conversión explícita de tipos.
+[SQL: SELECT reglas_credito.id_regla AS reglas_credito_id_regla, reglas_credito.id_empresa AS reglas_credito_id_empresa, reglas_credito.codigo AS reglas_credito_codigo, reglas_credito.nombre AS reglas_credito_nombre, reglas_credito.porcentaje AS reglas_credito_porcentaje, reglas_credito.dias_intervalo AS reglas_credito_dias_intervalo, reglas_credito.activo AS reglas_credito_activo 
+FROM reglas_credito 
+WHERE reglas_credito.id_regla = %(id_regla_1)s::VARCHAR AND reglas_credito.id_empresa = %(id_empresa_1)s::INTEGER 
+ LIMIT %(param_1)s::INTEGER]
+[parameters: {'id_regla_1': '1', 'id_empresa_1': 1, 'param_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+-------------------------------------
+
+--- ERROR CREATE 2026-04-06 15:38:18.087123 ---
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2125, in _exec_insertmany_context
+    dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.NotNullViolation: el valor nulo en la columna «id_empresa» de la relación «movimientos_contables» viola la restricción “not-null”
+DETAIL:  La fila que falla contiene (159, 48, Cuentas por Cobrar, 1300000.00, 0.00, null).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\app\api\creditos.py", line 273, in create_credito
+    db.session.commit()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\scoping.py", line 597, in commit
+    return self._proxied.commit()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1143, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1844, in _execute_context
+    return self._exec_insertmany_context(dialect, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2133, in _exec_insertmany_context
+    self._handle_dbapi_exception(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2125, in _exec_insertmany_context
+    dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.IntegrityError: (psycopg.errors.NotNullViolation) el valor nulo en la columna «id_empresa» de la relación «movimientos_contables» viola la restricción “not-null”
+DETAIL:  La fila que falla contiene (159, 48, Cuentas por Cobrar, 1300000.00, 0.00, null).
+[SQL: INSERT INTO movimientos_contables (id_asiento, id_empresa, cuenta, debe, haber) SELECT p0::INTEGER, p1::INTEGER, p2::VARCHAR, p3::NUMERIC, p4::NUMERIC FROM (VALUES (%(id_asiento__0)s::INTEGER, %(id_empresa__0)s::INTEGER, %(cuenta__0)s::VARCHAR, %(deb ... 317 characters truncated ... TURNING movimientos_contables.id_movimiento, movimientos_contables.id_movimiento AS id_movimiento__1]
+[parameters: {'id_empresa__0': None, 'debe__0': 1300000.0, 'haber__0': 0, 'id_asiento__0': 48, 'cuenta__0': 'Cuentas por Cobrar', 'id_empresa__1': None, 'debe__1': 0, 'haber__1': 1000000.0, 'id_asiento__1': 48, 'cuenta__1': 'Caja', 'id_empresa__2': None, 'debe__2': 0, 'haber__2': 300000.0, 'id_asiento__2': 48, 'cuenta__2': 'Intereses por Cobrar'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+-------------------------------------
+
+--- ERROR CREATE 2026-04-06 15:38:27.675619 ---
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2125, in _exec_insertmany_context
+    dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.NotNullViolation: el valor nulo en la columna «id_empresa» de la relación «movimientos_contables» viola la restricción “not-null”
+DETAIL:  La fila que falla contiene (160, 49, Cuentas por Cobrar, 1300000.00, 0.00, null).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\app\api\creditos.py", line 273, in create_credito
+    db.session.commit()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\scoping.py", line 597, in commit
+    return self._proxied.commit()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1143, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1844, in _execute_context
+    return self._exec_insertmany_context(dialect, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2133, in _exec_insertmany_context
+    self._handle_dbapi_exception(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2125, in _exec_insertmany_context
+    dialect.do_execute(
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\PROYECTOS\CreditoSquid\CRD-backend\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.IntegrityError: (psycopg.errors.NotNullViolation) el valor nulo en la columna «id_empresa» de la relación «movimientos_contables» viola la restricción “not-null”
+DETAIL:  La fila que falla contiene (160, 49, Cuentas por Cobrar, 1300000.00, 0.00, null).
+[SQL: INSERT INTO movimientos_contables (id_asiento, id_empresa, cuenta, debe, haber) SELECT p0::INTEGER, p1::INTEGER, p2::VARCHAR, p3::NUMERIC, p4::NUMERIC FROM (VALUES (%(id_asiento__0)s::INTEGER, %(id_empresa__0)s::INTEGER, %(cuenta__0)s::VARCHAR, %(deb ... 317 characters truncated ... TURNING movimientos_contables.id_movimiento, movimientos_contables.id_movimiento AS id_movimiento__1]
+[parameters: {'id_empresa__0': None, 'debe__0': 1300000.0, 'haber__0': 0, 'id_asiento__0': 49, 'cuenta__0': 'Cuentas por Cobrar', 'id_empresa__1': None, 'debe__1': 0, 'haber__1': 1000000.0, 'id_asiento__1': 49, 'cuenta__1': 'Caja', 'id_empresa__2': None, 'debe__2': 0, 'haber__2': 300000.0, 'id_asiento__2': 49, 'cuenta__2': 'Intereses por Cobrar'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+-------------------------------------

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from sqlalchemy import func, or_
 from app.extensions import db
 from app.models.catalog import Cliente, Usuario
@@ -43,7 +43,8 @@ def permission_required(permission_name):
 def get_clientes():
     q = (request.args.get("q") or "").strip()
     
-    query = Cliente.query
+    id_empresa = get_jwt().get("id_empresa")
+    query = Cliente.query.filter_by(id_empresa=id_empresa)
     
     if q:
         search = f"%{q}%"
@@ -53,8 +54,8 @@ def get_clientes():
             Cliente.documento.ilike(search)
         ))
     
-    # Order by Last Name then First Name
-    clientes = query.order_by(Cliente.apellido.asc(), Cliente.nombre.asc()).all()
+    # Order by creation (ID) so new clients go to the bottom
+    clientes = query.order_by(Cliente.id_cliente.asc()).all()
     return jsonify([c.to_dict() for c in clientes]), 200
 
 @bp.post("/")
@@ -65,13 +66,15 @@ def create_cliente():
     apellido = (data.get("apellido") or "").strip()
     documento = (data.get("documento") or "").strip()
     
+    id_empresa = get_jwt().get("id_empresa")
     if not nombre or not apellido or not documento:
         return jsonify({"message": "Nombre, Apellido y Documento son obligatorios"}), 400
         
-    if Cliente.query.filter(Cliente.documento == documento).first():
-        return jsonify({"message": "Ya existe un cliente con ese documento"}), 409
+    if Cliente.query.filter(Cliente.documento == documento, Cliente.id_empresa == id_empresa).first():
+        return jsonify({"message": "Ya existe un cliente con ese documento para esta empresa"}), 409
         
     nuevo = Cliente(
+        id_empresa=id_empresa,
         nombre=nombre,
         apellido=apellido,
         documento=documento,
@@ -90,9 +93,10 @@ def create_cliente():
 @bp.put("/<int:id_cliente>")
 @permission_required("cliente.gestionar")
 def update_cliente(id_cliente):
-    cliente = Cliente.query.get(id_cliente)
+    id_empresa = get_jwt().get("id_empresa")
+    cliente = Cliente.query.filter_by(id_cliente=id_cliente, id_empresa=id_empresa).first()
     if not cliente:
-        return jsonify({"message": "Cliente no encontrado"}), 404
+        return jsonify({"message": "Cliente no encontrado o acceso denegado"}), 404
         
     data = request.get_json() or {}
     
@@ -105,8 +109,8 @@ def update_cliente(id_cliente):
     # Check Document uniqueness if changed
     new_doc = (data.get("documento") or "").strip()
     if new_doc and new_doc != cliente.documento:
-        if Cliente.query.filter(Cliente.documento == new_doc).first():
-            return jsonify({"message": "Ya existe otro cliente con ese documento"}), 409
+        if Cliente.query.filter(Cliente.documento == new_doc, Cliente.id_empresa == id_empresa).first():
+            return jsonify({"message": "Ya existe otro cliente con ese documento en esta empresa"}), 409
         cliente.documento = new_doc
         
     try:
@@ -119,9 +123,10 @@ def update_cliente(id_cliente):
 @bp.delete("/<int:id_cliente>")
 @permission_required("cliente.gestionar")
 def delete_cliente(id_cliente):
-    cliente = Cliente.query.get(id_cliente)
+    id_empresa = get_jwt().get("id_empresa")
+    cliente = Cliente.query.filter_by(id_cliente=id_cliente, id_empresa=id_empresa).first()
     if not cliente:
-        return jsonify({"message": "Cliente no encontrado"}), 404
+        return jsonify({"message": "Cliente no encontrado o acceso denegado"}), 404
         
     try:
         # Physical delete as per new schema (no 'estado' column)

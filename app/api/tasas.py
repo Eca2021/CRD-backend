@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.extensions import db
 from app.models.catalog import TasaInteres, Usuario
 
@@ -40,7 +40,8 @@ def permission_required(permission_name):
 @bp.get("/")
 @jwt_required() # Allow read for all authenticated users (needed for dropdowns)
 def get_tasas():
-    tasas = TasaInteres.query.order_by(TasaInteres.porcentaje.asc()).all()
+    id_empresa = get_jwt().get("id_empresa")
+    tasas = TasaInteres.query.filter_by(id_empresa=id_empresa).order_by(TasaInteres.porcentaje.asc()).all()
     return jsonify([t.to_dict() for t in tasas]), 200
 
 @bp.post("/")
@@ -53,10 +54,12 @@ def create_tasa():
     except:
         return jsonify({"message": "Porcentaje inválido"}), 400
         
+    id_empresa = get_jwt().get("id_empresa")
     if not nombre:
         return jsonify({"message": "Nombre de tasa es obligatorio"}), 400
     
     nuevo = TasaInteres(
+        id_empresa=id_empresa,
         nombre_tasa=nombre,
         porcentaje=porcentaje,
         descripcion=data.get("descripcion")
@@ -73,9 +76,10 @@ def create_tasa():
 @bp.put("/<int:id_tasa>")
 @permission_required("tasa.gestionar")
 def update_tasa(id_tasa):
-    tasa = TasaInteres.query.get(id_tasa)
+    id_empresa = get_jwt().get("id_empresa")
+    tasa = TasaInteres.query.filter_by(id_tasa=id_tasa, id_empresa=id_empresa).first()
     if not tasa:
-        return jsonify({"message": "Tasa no encontrada"}), 404
+        return jsonify({"message": "Tasa no encontrada o acceso denegado"}), 404
         
     data = request.get_json() or {}
     tasa.nombre_tasa = data.get("nombre_tasa", tasa.nombre_tasa)
@@ -96,7 +100,8 @@ def update_tasa(id_tasa):
 @bp.delete("/<int:id_tasa>")
 @permission_required("tasa.gestionar")
 def delete_tasa(id_tasa):
-    tasa = TasaInteres.query.get(id_tasa)
+    id_empresa = get_jwt().get("id_empresa")
+    tasa = TasaInteres.query.filter_by(id_tasa=id_tasa, id_empresa=id_empresa).first()
     if not tasa:
         return jsonify({"message": "Tasa no encontrada"}), 404
         

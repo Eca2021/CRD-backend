@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.extensions import db
 from app.models.catalog import ReglaCredito, TasaInteres, Usuario
 
@@ -37,13 +37,15 @@ def permission_required(permission_name):
 @bp.get("/")
 @jwt_required()
 def get_reglas():
-    reglas = ReglaCredito.query.filter_by(activo=True).all()
+    id_empresa = get_jwt().get("id_empresa")
+    reglas = ReglaCredito.query.filter_by(id_empresa=id_empresa, activo=True).all()
     return jsonify([r.to_dict() for r in reglas]), 200
 
 @bp.post("/")
 @permission_required("regla.gestionar")
 def create_regla():
     data = request.get_json() or {}
+    id_empresa = get_jwt().get("id_empresa")
     try:
         codigo = data.get("codigo")
         nombre = data.get("nombre")
@@ -56,6 +58,7 @@ def create_regla():
         return jsonify({"message": "Faltan campos obligatorios"}), 400
         
     nueva = ReglaCredito(
+        id_empresa=id_empresa,
         codigo=codigo,
         nombre=nombre,
         porcentaje=porcentaje,
@@ -73,9 +76,10 @@ def create_regla():
 @bp.put("/<int:id_regla>")
 @permission_required("regla.gestionar")
 def update_regla(id_regla):
-    regla = ReglaCredito.query.get(id_regla)
+    id_empresa = get_jwt().get("id_empresa")
+    regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
     if not regla:
-        return jsonify({"message": "Regla no encontrada"}), 404
+        return jsonify({"message": "Regla no encontrada o acceso denegado"}), 404
         
     data = request.get_json() or {}
     regla.nombre = data.get("nombre", regla.nombre)
@@ -95,7 +99,8 @@ def update_regla(id_regla):
 @bp.delete("/<int:id_regla>")
 @permission_required("regla.gestionar")
 def delete_regla(id_regla):
-    regla = ReglaCredito.query.get(id_regla)
+    id_empresa = get_jwt().get("id_empresa")
+    regla = ReglaCredito.query.filter_by(id_regla=id_regla, id_empresa=id_empresa).first()
     if not regla:
         return jsonify({"message": "Regla no encontrada"}), 404
     

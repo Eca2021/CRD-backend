@@ -5,9 +5,32 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, backref
 
+class Empresa(db.Model):
+    __tablename__ = 'empresa'
+    id_empresa = Column(Integer, primary_key=True)
+    nombre = Column(String(255), nullable=False)
+    ruc = Column(String(50), unique=True, nullable=False)
+    direccion = Column(Text)
+    phone = Column(String(50))
+    email = Column(String(100))
+    logo_url = Column(Text)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    def to_dict(self):
+        return {
+            'id_empresa': self.id_empresa,
+            'nombre': self.nombre,
+            'ruc': self.ruc,
+            'direccion': self.direccion,
+            'phone': self.phone,
+            'email': self.email,
+            'logo_url': self.logo_url
+        }
+
 class Estado(db.Model):
     __tablename__ = 't_status'
     id = Column(Integer, primary_key=True)
+    id_empresa = Column(Integer, ForeignKey('empresa.id_empresa'), nullable=False)
     value = Column(String(50), unique=True, nullable=False)
     description = Column(Text, nullable=False)
 
@@ -17,6 +40,7 @@ class Estado(db.Model):
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
     id_usuario = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=True) # Permitir null para SuperAdmins Globales
     nombre_usuario = db.Column(db.String(50), unique=True, nullable=False)
     nombre = db.Column(db.String(100))
     email = db.Column(db.String(100), unique=True)
@@ -24,6 +48,8 @@ class Usuario(db.Model):
     estado = db.Column(db.String(20), nullable=False, default='ACTIVO')
     created_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp())
     updated_at = db.Column(db.TIMESTAMP, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+    
+    empresa = db.relationship('Empresa', backref='usuarios')
 
     roles = db.relationship('UsuarioRol', backref='usuario', lazy=True, cascade="all, delete-orphan")
     historial_accesos = db.relationship('HistorialAcceso', backref='usuario', lazy=True)
@@ -31,6 +57,8 @@ class Usuario(db.Model):
     def to_dict(self):
         return {
             'id_usuario': self.id_usuario,
+            'id_empresa': self.id_empresa,
+            'empresa_nombre': self.empresa.nombre if self.empresa else 'Acceso Global',
             'nombre_usuario': self.nombre_usuario,
             'nombre': self.nombre,
             'email': self.email,
@@ -44,6 +72,8 @@ class HistorialAcceso(db.Model):
     __tablename__ = 'historial_accesos'
     id_acceso = Column(Integer, primary_key=True)
     id_usuario = Column(Integer, ForeignKey('usuarios.id_usuario', ondelete='SET NULL'), nullable=True)
+    # id_empresa redundante pero util para auditoria rapida
+    id_empresa = Column(Integer, ForeignKey('empresa.id_empresa'), nullable=True) 
     username_intentado = Column(String(50))
     fecha_hora = Column(DateTime, server_default=func.current_timestamp(), index=True)
     evento = Column(String(20))
@@ -144,9 +174,13 @@ class CompanySetting(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+# (Nota: CompanySetting quedará obsoleta en favor de Empresa, 
+# pero la mantenemos por compatibilidad para no romper código antiguo)
+
 class Cliente(db.Model):
     __tablename__ = 'clientes'
     id_cliente = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     documento = db.Column(db.String(20), nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     apellido = db.Column(db.String(100), nullable=False)
@@ -168,6 +202,7 @@ class Cliente(db.Model):
 class TasaInteres(db.Model):
     __tablename__ = 'tasas_interes'
     id_tasa = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     nombre_tasa = db.Column(db.String(50))
     porcentaje = db.Column(db.Numeric, nullable=False)
     descripcion = db.Column(db.Text)
@@ -183,6 +218,7 @@ class TasaInteres(db.Model):
 class ReglaCredito(db.Model):
     __tablename__ = 'reglas_credito'
     id_regla = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     codigo = db.Column(db.String(20), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     porcentaje = db.Column(db.Numeric, nullable=False)
@@ -202,6 +238,7 @@ class ReglaCredito(db.Model):
 class Credito(db.Model):
     __tablename__ = 'creditos'
     id_credito = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente'), nullable=False)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False)
     id_regla = db.Column(db.Integer, db.ForeignKey('reglas_credito.id_regla'), nullable=False)
@@ -267,6 +304,7 @@ class DetalleCredito(db.Model):
 class FormaPago(db.Model):
     __tablename__ = 'formas_pago'
     id_forma_pago = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     nombre = db.Column(db.String(50), nullable=False)
 
     def to_dict(self):
@@ -278,6 +316,7 @@ class FormaPago(db.Model):
 class Pago(db.Model):
     __tablename__ = 'pagos'
     id_pago = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     id_detalle_credito = db.Column(db.Integer, db.ForeignKey('detalles_credito.id_detalle'), nullable=False)
     id_forma_pago = db.Column(db.Integer, db.ForeignKey('formas_pago.id_forma_pago'), nullable=False)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'))
@@ -307,6 +346,7 @@ class Pago(db.Model):
 class PagoAudit(db.Model):
     __tablename__ = 'historial_pagos_audit'
     id_audit = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=True)
     id_pago = db.Column(db.Integer)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'))
     accion = db.Column(db.String(20))
@@ -337,6 +377,7 @@ class PagoAudit(db.Model):
 class AsientoContable(db.Model):
     __tablename__ = 'asientos_contables'
     id_asiento = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     fecha = db.Column(db.DateTime, default=db.func.current_timestamp())
     glosa = db.Column(db.Text)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'))
@@ -357,6 +398,7 @@ class MovimientoContable(db.Model):
     __tablename__ = 'movimientos_contables'
     id_movimiento = db.Column(db.Integer, primary_key=True)
     id_asiento = db.Column(db.Integer, db.ForeignKey('asientos_contables.id_asiento'), nullable=False)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=True)
     cuenta = db.Column(db.String(100), nullable=False)
     debe = db.Column(db.Numeric, default=0)
     haber = db.Column(db.Numeric, default=0)
@@ -372,6 +414,7 @@ class MovimientoContable(db.Model):
 class MovimientoAdmin(db.Model):
     __tablename__ = 'movimientos_admin'
     id = db.Column(db.Integer, primary_key=True)
+    id_empresa = db.Column(db.Integer, db.ForeignKey('empresa.id_empresa'), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)
     monto = db.Column(db.Numeric(15, 2), nullable=False)
     descripcion = db.Column(db.Text)

@@ -80,11 +80,21 @@ def create_role():
         return jsonify({"message": "Error interno del servidor al crear rol", "error": str(e)}), 500
 
 
-# GET /api/roles
-@bp.get("/")
+@bp.get("/", strict_slashes=False)
 @roles_required(["Admin", "Vendedor", "Gerente"])
 def get_roles():
+    from flask_jwt_extended import get_jwt
+    claims = get_jwt()
+    current_roles = [r.upper() for r in (claims.get("roles", []) or [])]
+    # SEGURIDAD: Solo es SUPERADMIN si tiene el rol Y no tiene empresa asignada
+    is_super = "SUPERADMIN" in current_roles and claims.get("id_empresa") is None
+
     roles = Rol.query.order_by(Rol.id_rol.asc()).all()
+    
+    if not is_super:
+        # Filtrar el rol SuperAdmin para no-superadmins
+        roles = [r for r in roles if r.nombre and r.nombre.upper() != 'SUPERADMIN']
+        
     return jsonify([_role_to_dict(r) for r in roles]), 200
 
 
