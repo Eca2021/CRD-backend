@@ -26,11 +26,15 @@ def migrate():
                 nombre VARCHAR(255) NOT NULL,
                 ruc VARCHAR(50) UNIQUE NOT NULL,
                 direccion TEXT,
-                telefono VARCHAR(50),
+                phone VARCHAR(50),
                 email VARCHAR(100),
                 logo_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            
+            -- Asegurar que las columnas existan con los nombres correctos
+            ALTER TABLE empresa ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+            ALTER TABLE empresa ADD COLUMN IF NOT EXISTS email VARCHAR(100);
         """))
         
         # 2. Insertar las dos empresas iniciales
