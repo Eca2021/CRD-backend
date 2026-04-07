@@ -22,9 +22,8 @@ def roles_required(required_roles):
             claims = get_jwt() or {}
             roles = [r.upper() for r in (claims.get("roles", []) or [])]
             
-            # SuperAdmin bypass: siempre tiene acceso si es GLOBAL
-            id_empresa = claims.get("id_empresa")
-            if "SUPERADMIN" in roles and id_empresa is None:
+            # SuperAdmin bypass: siempre tiene acceso total
+            if "SUPERADMIN" in roles:
                 return fn(*args, **kwargs)
                 
             required_upper = [r.upper() for r in required_roles]
