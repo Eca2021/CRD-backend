@@ -50,7 +50,7 @@ def migrate():
         tables = [
             'usuarios', 'clientes', 'creditos', 'reglas_credito', 
             'tasas_interes', 'pagos', 'formas_pago', 'asientos_contables', 
-            'movimientos_contables', 'movimientos_admin'
+            'movimientos_contables', 'movimientos_admin', 'historial_accesos'
         ]
         
         for table in tables:
