@@ -32,7 +32,13 @@ def register_blueprints(app):
     app.register_blueprint(clientes_bp, url_prefix="/api/clientes")
     app.register_blueprint(tasas_bp, url_prefix="/api/tasas")
     app.register_blueprint(creditos_bp, url_prefix="/api/creditos")
+    
+    # Registro principal para formas_pago y otros (el que usa el Front viejo)
     app.register_blueprint(pagos_bp, url_prefix="/api/pagos")
+
+    # Registro secundario para que el botón de cobrar funcione (sin /api)
+    # Le ponemos un nombre diferente ('pagos_fix') para que Flask no proteste
+    app.register_blueprint(pagos_bp, url_prefix="/pagos", name="pagos_fix")
     app.register_blueprint(contabilidad_bp, url_prefix="/api/contabilidad")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(reglas_bp, url_prefix="/api/reglas")

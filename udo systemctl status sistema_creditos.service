@@ -1,0 +1,50 @@
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/permisos/' (OPTIONS, POST) -> permisos.create_permission>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/permisos/<id_permiso>' (OPTIONS, GET, HEAD) -> permisos.get_permission>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/permisos/<id_permiso>' (OPTIONS, PUT) -> permisos.update_permission>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/permisos/<id_permiso>' (DELETE, OPTIONS) -> permisos.delete_permission>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company-settings' (OPTIONS) -> company_settings.company_settings_preflight>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company_settings' (OPTIONS) -> company_settings.company_settings_preflight>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company-settings' (OPTIONS, GET, HEAD) -> company_settings.get_company_settings>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company_settings' (OPTIONS, GET, HEAD) -> company_settings.get_company_settings>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company-settings' (OPTIONS, PUT) -> company_settings.update_company_settings>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/company-settings/company_settings' (OPTIONS, PUT) -> company_settings.update_company_settings>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/clientes/' (OPTIONS, GET, HEAD) -> clientes.get_clientes>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/clientes/' (OPTIONS, POST) -> clientes.create_cliente>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/clientes/<id_cliente>' (OPTIONS, PUT) -> clientes.update_cliente>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/clientes/<id_cliente>' (DELETE, OPTIONS) -> clientes.delete_cliente>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/tasas/' (OPTIONS, GET, HEAD) -> tasas.get_tasas>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/tasas/' (OPTIONS, POST) -> tasas.create_tasa>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/tasas/<id_tasa>' (OPTIONS, PUT) -> tasas.update_tasa>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/tasas/<id_tasa>' (DELETE, OPTIONS) -> tasas.delete_tasa>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/preview' (OPTIONS, POST) -> creditos.preview_credito>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/' (OPTIONS, POST) -> creditos.create_credito>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/<id_credito>/anular' (OPTIONS, POST) -> creditos.anular_credito>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/' (OPTIONS, GET, HEAD) -> creditos.get_creditos>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/cliente/<id_cliente>' (OPTIONS, GET, HEAD) -> creditos.get_creditos_by_cliente>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/creditos/<id_credito>' (OPTIONS, GET, HEAD) -> creditos.get_credito_by_id>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/formas_pago' (OPTIONS, GET, HEAD) -> pagos.get_formas_pago>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/' (OPTIONS, POST) -> pagos.registrar_pago>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/' (OPTIONS, GET, HEAD) -> pagos.get_pagos>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/detalle/<id_detalle>' (OPTIONS, GET, HEAD) -> pagos.get_pagos_by_detalle>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/<id_pago>/anular' (OPTIONS, POST) -> pagos.anular_pago>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/pagos/auditoria' (OPTIONS, GET, HEAD) -> pagos.get_auditoria_pagos>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/contabilidad/dashboard' (OPTIONS, GET, HEAD) -> contabilidad.get_dashboard_data>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/contabilidad/asientos' (OPTIONS, GET, HEAD) -> contabilidad.get_asientos>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/contabilidad/asientos' (OPTIONS, POST) -> contabilidad.create_asiento_manual>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/contabilidad/apertura' (OPTIONS, POST) -> contabilidad.apertura_capital>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/dashboard/summary' (OPTIONS, GET, HEAD) -> dashboard.get_dashboard_summary>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/reglas/' (OPTIONS, GET, HEAD) -> reglas.get_reglas>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/reglas/' (OPTIONS, POST) -> reglas.create_regla>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/reglas/<id_regla>' (OPTIONS, PUT) -> reglas.update_regla>,
+Mar 17 15:41:10 srv1362612 gunicorn[914996]:  <Rule '/api/reglas/<id_regla>' (DELETE, OPTIONS) -> reglas.delete_regla>])
+Mar 17 15:41:10 srv1362612 gunicorn[914991]: [2026-03-17 15:41:10 +0000] [914991] [INFO] Shutting down: Master
+Mar 17 15:41:10 srv1362612 systemd[1]: sistema_creditos.service: Deactivated successfully.
+Mar 17 15:41:10 srv1362612 systemd[1]: Stopped sistema_creditos.service - Gunicorn para Sistema de Creditos.
+Mar 17 15:41:10 srv1362612 systemd[1]: sistema_creditos.service: Consumed 3.741s CPU time.
+Mar 17 15:41:10 srv1362612 systemd[1]: Started sistema_creditos.service - Gunicorn para Sistema de Creditos.
+Mar 17 15:41:10 srv1362612 gunicorn[915115]: [2026-03-17 15:41:10 +0000] [915115] [INFO] Starting gunicorn 23.0.0
+Mar 17 15:41:10 srv1362612 gunicorn[915115]: [2026-03-17 15:41:10 +0000] [915115] [INFO] Listening at: http://0.0.0.0:5000 (915115)
+Mar 17 15:41:10 srv1362612 gunicorn[915115]: [2026-03-17 15:41:10 +0000] [915115] [INFO] Using worker: sync
+Mar 17 15:41:10 srv1362612 gunicorn[915118]: [2026-03-17 15:41:10 +0000] [915118] [INFO] Booting worker with pid: 915118
+Mar 17 15:41:10 srv1362612 gunicorn[915119]: [2026-03-17 15:41:10 +0000] [915119] [INFO] Booting worker with pid: 915119
+Mar 17 15:41:10 srv1362612 gunicorn[915120]: [2026-03-17 15:41:10 +0000] [915120] [INFO] Booting worker with pid: 915120
