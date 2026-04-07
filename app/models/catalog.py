@@ -27,15 +27,6 @@ class Empresa(db.Model):
             'logo_url': self.logo_url
         }
 
-class Estado(db.Model):
-    __tablename__ = 't_status'
-    id = Column(Integer, primary_key=True)
-    id_empresa = Column(Integer, ForeignKey('empresa.id_empresa'), nullable=False)
-    value = Column(String(50), unique=True, nullable=False)
-    description = Column(Text, nullable=False)
-
-    def to_dict(self):
-        return {'id': self.id, 'description': self.description}
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'

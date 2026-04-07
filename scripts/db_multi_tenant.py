@@ -1,7 +1,14 @@
+import os
+import sys
+from sqlalchemy import text
+
+# Añadir el directorio raíz al path para importar la app
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from app import create_app
 from app.extensions import db
-from sqlalchemy import text
-import sys
 
 def migrate():
     app = create_app()
@@ -39,11 +46,25 @@ def migrate():
         tables = [
             'usuarios', 'clientes', 'creditos', 'reglas_credito', 
             'tasas_interes', 'pagos', 'formas_pago', 'asientos_contables', 
-            'movimientos_contables', 'movimientos_admin', 't_status'
+            'movimientos_contables', 'movimientos_admin'
         ]
         
         for table in tables:
             print(f"Migrando tabla: {table}")
+            
+            # Verificar si la tabla existe antes de intentar alterarla
+            check_table = db.session.execute(text(f"""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = '{table}'
+                );
+            """)).scalar()
+            
+            if not check_table:
+                print(f"  ⚠️ Tabla '{table}' no existe, saltando...")
+                continue
+
             # Añadir columna id_empresa si no existe
             db.session.execute(text(f"""
                 ALTER TABLE {table} 
