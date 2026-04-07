@@ -15,6 +15,10 @@ def migrate():
     with app.app_context():
         print("Iniciando migración multi-tenant...")
         
+        # 0. Permitir que usuarios globales no tengan empresa (NULL)
+        db.session.execute(text("ALTER TABLE usuarios ALTER COLUMN id_empresa DROP NOT NULL;"))
+        db.session.commit()
+        
         # 1. Crear tabla de empresas si no existe
         db.session.execute(text("""
             CREATE TABLE IF NOT EXISTS empresa (
